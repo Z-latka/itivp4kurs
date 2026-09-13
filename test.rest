@@ -1,0 +1,70 @@
+
+GET http://localhost:3000/consultations
+
+###
+
+
+POST http://localhost:3000/consultations
+Content-Type: application/json
+
+{
+  "topic": "Депрессия",
+  "description": "Работа с депрессивными состояниями",
+  "duration": 90
+}
+
+###
+
+
+PUT http://localhost:3000/consultations/1
+Content-Type: application/json
+
+{
+  "topic": "Тревожность (обновлено)",
+  "description": "Новое описание: углубленная работа",
+  "duration": 75,
+  "status": "busy"
+}
+
+###
+
+
+DELETE http://localhost:3000/consultations/2
+
+
+POST http://localhost:3000/consultations
+Content-Type: application/json
+
+{
+  "topic": "Стресс",
+  "description": "Помощь в управлении стрессом",
+  "duration": 45
+}
+
+### 
+
+PUT http://localhost:3000/consultations/2
+Content-Type: application/json
+
+{
+  "topic": "Тревожность (обновлено)",
+  "description": "Новое описание: углубленная работа",
+  "duration": 75,
+  "status": "busy"
+}
+
+###
+
+POST http://localhost:3000/consultations
+Content-Type: application/json
+
+
+
+
+{
+  
+  "description": "Работа с депрессивными состояниями",
+  "duration": 90
+}
+
+
