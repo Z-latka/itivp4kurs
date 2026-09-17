@@ -1,104 +1,97 @@
 const express = require("express");
 const router = express.Router();
-let { consultations, nextId } = require("../models/consultations");
+const { Consultation } = require("../models");
 
-router.get("/", (req, res) => {
-  res.json(consultations);
+// GET /consultations — получить все записи
+router.get("/", async (req, res, next) => {
+  try {
+    const consultations = await Consultation.findAll();
+    res.json(consultations);
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.get("/:id", (req, res) => {
-  const id = parseInt(req.params.id);
-  const consultation = consultations.find((c) => c.id === id);
-
-  if (!consultation) {
-    return res.status(404).json({
-      error: "Консультация не найдена",
-      message: `Консультация с ID ${id} не существует`,
-    });
+// GET /consultations/:id — получить по ID
+router.get("/:id", async (req, res, next) => {
+  try {
+    const consultation = await Consultation.findByPk(req.params.id);
+    if (!consultation) {
+      return res.status(404).json({
+        error: "Консультация не найдена",
+        message: `Консультация с ID ${req.params.id} не существует`,
+      });
+    }
+    res.json(consultation);
+  } catch (err) {
+    next(err);
   }
-
-  res.json(consultation);
 });
 
-router.post("/", (req, res) => {
-  const { topic, description, duration } = req.body;
+// POST /consultations — создать запись
+router.post("/", async (req, res, next) => {
+  try {
+    const { topic, description, duration, status, price } = req.body;
+    if (!topic || !description || !duration) {
+      return res.status(400).json({
+        error: "Неверные данные запроса",
+        message: "Поля topic, description и duration обязательны",
+      });
+    }
 
-  if (!topic || !description || !duration) {
-    return res.status(400).json({
-      error: "Неверные данные запроса",
-      message: "Поля topic, description и duration обязательны",
+    const newConsultation = await Consultation.create({
+      topic,
+      description,
+      duration,
+      status: status || "available",
+      price: price || 0.0,
     });
+
+    res.status(201).json(newConsultation);
+  } catch (err) {
+    next(err);
   }
-
-  if (typeof duration !== "number" || duration <= 0) {
-    return res.status(400).json({
-      error: "Неверные данные запроса",
-      message: "Duration должен быть положительным числом",
-    });
-  }
-
-  const newConsultation = {
-    id: nextId++,
-    topic,
-    description,
-    duration,
-    status: "available",
-    createdAt: new Date().toISOString(),
-  };
-
-  consultations.push(newConsultation);
-  res.status(201).json(newConsultation);
 });
 
-router.put("/:id", (req, res) => {
-  const id = parseInt(req.params.id);
-  const { topic, description, duration, status } = req.body;
+// PUT /consultations/:id — обновить запись
+router.put("/:id", async (req, res, next) => {
+  try {
+    const { topic, description, duration, status, price } = req.body;
+    const consultation = await Consultation.findByPk(req.params.id);
 
-  if (!topic || !description || !duration || !status) {
-    return res.status(400).json({
-      error: "Неверные данные запроса",
-      message: "Все поля обязательны для полного обновления",
-    });
+    if (!consultation) {
+      return res.status(404).json({
+        error: "Консультация не найдена",
+        message: `Консультация с ID ${req.params.id} не существует`,
+      });
+    }
+
+    await consultation.update({ topic, description, duration, status, price });
+    res.json(consultation);
+  } catch (err) {
+    next(err);
   }
-
-  const index = consultations.findIndex((c) => c.id === id);
-
-  if (index === -1) {
-    return res.status(404).json({
-      error: "Консультация не найдена",
-      message: `Консультация с ID ${id} не существует`,
-    });
-  }
-
-  consultations[index] = {
-    id,
-    topic,
-    description,
-    duration,
-    status,
-    createdAt: consultations[index].createdAt,
-    updatedAt: new Date().toISOString(),
-  };
-
-  res.json(consultations[index]);
 });
 
-router.delete("/:id", (req, res) => {
-  const id = parseInt(req.params.id);
-  const index = consultations.findIndex((c) => c.id === id);
+// DELETE /consultations/:id — удалить запись
+router.delete("/:id", async (req, res, next) => {
+  try {
+    const consultation = await Consultation.findByPk(req.params.id);
+    if (!consultation) {
+      return res.status(404).json({
+        error: "Консультация не найдена",
+        message: `Консультация с ID ${req.params.id} не существует`,
+      });
+    }
 
-  if (index === -1) {
-    return res.status(404).json({
-      error: "Консультация не найдена",
-      message: `Консультация с ID ${id} не существует`,
+    await consultation.destroy();
+    res.json({
+      message: "Консультация успешно удалена",
+      consultation,
     });
+  } catch (err) {
+    next(err);
   }
-
-  const deleted = consultations.splice(index, 1);
-  res.json({
-    message: "Консультация успешно удалена",
-    consultation: deleted[0],
-  });
 });
 
 module.exports = router;

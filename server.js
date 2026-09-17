@@ -1,12 +1,19 @@
+require("dotenv").config();
 const express = require("express");
 const app = express();
-const PORT = 3000;
-
+const PORT = process.env.PORT || 3000;
+const { sequelize } = require("./models");
 const consultationsRouter = require("./routes/consultations");
 
 app.use(express.json());
-
 app.use("/consultations", consultationsRouter);
+
+app.use((req, res) => {
+  res.status(404).json({
+    error: "Маршрут не найден",
+    message: `Маршрут ${req.method} ${req.url} не существует`,
+  });
+});
 
 app.use((err, req, res, next) => {
   console.error(err.stack);
@@ -16,14 +23,14 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.use((req, res) => {
-  res.status(404).json({
-    error: "Маршрут не найден",
-    message: `Маршрут ${req.method} ${req.url} не существует`,
+sequelize
+  .authenticate()
+  .then(() => {
+    console.log("База данных PostgreSQL успешно подключена.");
+    app.listen(PORT, () => {
+      console.log(`Сервер запущен на http://localhost:${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error("Ошибка подключения к базе данных:", err);
   });
-});
-
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-  console.log("API для сервиса психологической поддержки запущен");
-});
