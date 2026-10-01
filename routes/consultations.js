@@ -2,7 +2,6 @@ const express = require("express");
 const router = express.Router();
 const { Consultation } = require("../models");
 
-// GET /consultations — получить все записи
 router.get("/", async (req, res, next) => {
   try {
     const consultations = await Consultation.findAll();
@@ -12,7 +11,6 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-// GET /consultations/:id — получить по ID
 router.get("/:id", async (req, res, next) => {
   try {
     const consultation = await Consultation.findByPk(req.params.id);
@@ -28,7 +26,6 @@ router.get("/:id", async (req, res, next) => {
   }
 });
 
-// POST /consultations — создать запись
 router.post("/", async (req, res, next) => {
   try {
     const { topic, description, duration, status, price } = req.body;
@@ -53,7 +50,6 @@ router.post("/", async (req, res, next) => {
   }
 });
 
-// PUT /consultations/:id — обновить запись
 router.put("/:id", async (req, res, next) => {
   try {
     const { topic, description, duration, status, price } = req.body;
@@ -73,7 +69,6 @@ router.put("/:id", async (req, res, next) => {
   }
 });
 
-// DELETE /consultations/:id — удалить запись
 router.delete("/:id", async (req, res, next) => {
   try {
     const consultation = await Consultation.findByPk(req.params.id);

@@ -4,9 +4,12 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const { sequelize } = require("./models");
 const consultationsRouter = require("./routes/consultations");
+const authRouter = require("./routes/auth");
 
 app.use(express.json());
+
 app.use("/consultations", consultationsRouter);
+app.use("/auth", authRouter);
 
 app.use((req, res) => {
   res.status(404).json({

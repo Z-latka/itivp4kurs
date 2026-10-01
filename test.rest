@@ -1,10 +1,63 @@
+@baseUrl = http://localhost:3000
+@authToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJ1c2VyMUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzkwODE1NzAxLCJleHAiOjE3OTA4MTkzMDF9.R63p_oyn_yNvsB_MAr9yBWv9Zgf-QDp3KS-nOTKJWEE
 
-GET http://localhost:3000/consultations
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "user1@example.com",
+  "password": "Password123!",
+  "role": "user"
+}
+
 
 ###
 
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
 
-POST http://localhost:3000/consultations
+{
+  "email": "admin@example.com",
+  "password": "AdminPassword123!",
+  "role": "admin"
+}
+
+###
+
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "user1@example.com",
+  "password": "Password123!"
+}
+
+###
+
+GET {{baseUrl}}/auth/profile
+
+###
+
+GET {{baseUrl}}/auth/profile
+Authorization: Bearer {{authToken}}
+
+###
+
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "user1@example.com",
+  "password": "WrongPassword!"
+}
+
+###
+
+GET {{baseUrl}}/consultations
+
+###
+
+POST {{baseUrl}}/consultations
 Content-Type: application/json
 
 {
@@ -15,8 +68,7 @@ Content-Type: application/json
 
 ###
 
-
-PUT http://localhost:3000/consultations/1
+PUT {{baseUrl}}/consultations/1
 Content-Type: application/json
 
 {
@@ -28,43 +80,4 @@ Content-Type: application/json
 
 ###
 
-
-DELETE http://localhost:3000/consultations/2
-
-
-POST http://localhost:3000/consultations
-Content-Type: application/json
-
-{
-  "topic": "Стресс",
-  "description": "Помощь в управлении стрессом",
-  "duration": 45
-}
-
-### 
-
-PUT http://localhost:3000/consultations/2
-Content-Type: application/json
-
-{
-  "topic": "Тревожность (обновлено)",
-  "description": "Новое описание: углубленная работа",
-  "duration": 75,
-  "status": "busy"
-}
-
-###
-
-POST http://localhost:3000/consultations
-Content-Type: application/json
-
-
-
-
-{
-  
-  "description": "Работа с депрессивными состояниями",
-  "duration": 90
-}
-
-
+DELETE {{baseUrl}}/consultations/1
