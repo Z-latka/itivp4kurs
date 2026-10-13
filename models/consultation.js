@@ -3,9 +3,7 @@ const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
   class Consultation extends Model {
-    static associate(models) {
-      // Связи с другими моделями
-    }
+    static associate(models) {}
   }
   Consultation.init(
     {
