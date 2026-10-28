@@ -16,7 +16,6 @@ const INITIAL_FORM = {
 
 const DELAY = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Дополнительное улучшение: повтор запроса при ошибке (до 3 попыток с задержкой)
 const requestWithRetry = async (fn, retries = 3, delayMs = 1000) => {
   let lastError;
   for (let attempt = 1; attempt <= retries; attempt += 1) {
@@ -32,7 +31,21 @@ const requestWithRetry = async (fn, retries = 3, delayMs = 1000) => {
   throw lastError;
 };
 
-export default function ConsultationList() {
+const STATUS_LABELS = {
+  available: "Доступна",
+  active: "Активна",
+  completed: "Завершена",
+  busy: "Занята",
+};
+
+const STATUS_COLORS = {
+  available: "#2e7d32",
+  active: "#1565c0",
+  completed: "#7d3c98",
+  busy: "#c62828",
+};
+
+export default function ConsultationsPage() {
   const [consultations, setConsultations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -202,190 +215,320 @@ export default function ConsultationList() {
     }
   };
 
-  if (loading) {
-    return (
-      <div
-        style={{
-          maxWidth: "600px",
-          margin: "40px auto",
-          fontFamily: "Arial, sans-serif",
-          textAlign: "center",
-          color: "#666",
-        }}
-      >
-        Загрузка данных…
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div
-        style={{
-          maxWidth: "600px",
-          margin: "40px auto",
-          fontFamily: "Arial, sans-serif",
-          padding: "20px",
-          background: "#ffe6e6",
-          border: "1px solid #dc3545",
-          borderRadius: "5px",
-        }}
-      >
-        <h2>Ошибка загрузки</h2>
-        <p>{error}</p>
-        <button onClick={handleRetry} style={{ padding: "8px 16px", cursor: "pointer", background: "#007bff", color: "#fff", border: "none", borderRadius: "4px" }}>
-          Повторить
-        </button>
-      </div>
-    );
-  }
+  const statusKey = (item) => {
+    const s = (item.status || "").toLowerCase();
+    return STATUS_LABELS[s] ? s : "available";
+  };
 
   return (
-    <div style={{ maxWidth: "700px", margin: "20px auto", fontFamily: "Arial, sans-serif" }}>
-      <h2>Управление консультациями</h2>
-
-      <div style={{ marginBottom: "15px", fontSize: "0.9em", color: "#555" }}>
-        Всего записей: <strong>{consultations.length}</strong>
-      </div>
-
-      {notify && (
-        <div
-          style={{
-            padding: "10px",
-            background: notify.type === "error" ? "#ffe6e6" : "#e6f7e6",
-            border: `1px solid ${notify.type === "error" ? "#dc3545" : "#28a745"}`,
-            borderRadius: "5px",
-            marginBottom: "15px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
+    <section className="page consultations">
+      <div className="page-header">
+        <div>
+          <h2>Консультации</h2>
+          <p>Управление консультациями с сервером через REST API</p>
+        </div>
+        <button
+          className="btn btn-primary"
+          onClick={() => {
+            const el = document.getElementById("add-form");
+            if (el) el.scrollIntoView({ behavior: "smooth" });
           }}
         >
-          {notify.message}
-          <button onClick={clearNotify} style={{ cursor: "pointer", background: "none", border: "none", fontSize: "1.2em" }}>
-            ×
+          ➕ Новая консультация
+        </button>
+      </div>
+
+      {loading && (
+        <div className="loading-state">
+          <div className="spinner"></div>
+          <p>Загрузка консультаций с сервера…</p>
+        </div>
+      )}
+
+      {error && !loading && (
+        <div className="alert alert-error">
+          <span>⚠</span>
+          <span>{error}</span>
+          <button
+            className="btn btn-sm btn-outline"
+            onClick={handleRetry}
+            style={{ marginLeft: "auto" }}
+          >
+            Повторить
           </button>
         </div>
       )}
 
-      <form onSubmit={handleAdd} style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "20px" }}>
-        <input
-          type="text"
-          placeholder="Тема консультации..."
-          value={form.topic}
-          onChange={(e) => setForm({ ...form, topic: e.target.value })}
-          required
-        />
-        <input
-          type="text"
-          placeholder="Описание..."
-          value={form.description}
-          onChange={(e) => setForm({ ...form, description: e.target.value })}
-        />
-        <input
-          type="number"
-          placeholder="Длительность (мин)"
-          value={form.duration}
-          onChange={(e) => setForm({ ...form, duration: e.target.value })}
-          required
-        />
-        <select
-          value={form.status}
-          onChange={(e) => setForm({ ...form, status: e.target.value })}
-        >
-          <option value="Активна">Активна</option>
-          <option value="Завершена">Завершена</option>
-        </select>
-        <input
-          type="number"
-          placeholder="Цена"
-          value={form.price}
-          onChange={(e) => setForm({ ...form, price: e.target.value })}
-        />
-        <button
-          type="submit"
-          style={{ padding: "8px", background: "#007bff", color: "#fff", border: "none", cursor: "pointer" }}
-        >
-          Добавить консультацию
-        </button>
-      </form>
+      {!loading && !error && (
+        <>
+          {notify && (
+            <div className={`alert alert-${notify.type}`}>
+              <span>{notify.type === "error" ? "⚠" : "✓"}</span>
+              <span>{notify.message}</span>
+              <button
+                className="btn btn-sm"
+                onClick={clearNotify}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "inherit",
+                  fontSize: "1.25rem",
+                  padding: 0,
+                }}
+              >
+                ×
+              </button>
+            </div>
+          )}
 
-      <ul style={{ listStyle: "none", padding: 0 }}>
-        {consultations.length === 0 ? (
-          <p>Список пуст</p>
-        ) : (
-          consultations.map((item) => {
-            const isEditing = editingId === item.id;
-            if (isEditing) {
-              return (
-                <li key={item.id} style={{ border: "1px solid #ddd", padding: "10px", marginBottom: "8px", display: "flex", flexDirection: "column", gap: "8px" }}>
-                  <form onSubmit={handleEditSave} style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                    <input
-                      type="text"
-                      value={form.topic}
-                      onChange={(e) => setForm({ ...form, topic: e.target.value })}
-                      required
-                    />
-                    <input
-                      type="text"
-                      value={form.description}
-                      onChange={(e) => setForm({ ...form, description: e.target.value })}
-                    />
-                    <input
-                      type="number"
-                      value={form.duration}
-                      onChange={(e) => setForm({ ...form, duration: e.target.value })}
-                      required
-                    />
-                    <select
-                      value={form.status}
-                      onChange={(e) => setForm({ ...form, status: e.target.value })}
-                    >
-                      <option value="Активна">Активна</option>
-                      <option value="Завершена">Завершена</option>
-                    </select>
-                    <div style={{ display: "flex", gap: "8px" }}>
-                      <button type="submit" style={{ padding: "6px 12px", background: "#28a745", color: "#fff", border: "none", cursor: "pointer" }}>Сохранить</button>
-                      <button type="button" onClick={handleEditCancel} style={{ padding: "6px 12px", background: "#6c757d", color: "#fff", border: "none", cursor: "pointer" }}>Отмена</button>
-                    </div>
-                  </form>
-                  <button
-                    onClick={() => handleDelete(item.id)}
-                    style={{ alignSelf: "flex-end", background: "#dc3545", color: "#fff", border: "none", padding: "5px 10px", cursor: "pointer" }}
-                  >
-                    Удалить
-                  </button>
-                </li>
-              );
-            }
-            return (
-              <li key={item.id} style={{ border: "1px solid #ddd", padding: "10px", marginBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <strong>{item.topic}</strong> — {item.description || ""}
-                  <span style={{ fontSize: "0.85em", color: "#666" }}>
-                    {" "}
-                    [{item.status}] ({item.duration} мин, {item.price || 0} руб.)
-                  </span>
-                </div>
-                <div style={{ display: "flex", gap: "6px" }}>
-                  <button
-                    onClick={() => handleEditStart(item)}
-                    style={{ padding: "5px 10px", background: "#007bff", color: "#fff", border: "none", cursor: "pointer" }}
-                  >
-                    Редактировать
-                  </button>
-                  <button
-                    onClick={() => handleDelete(item.id)}
-                    style={{ padding: "5px 10px", background: "#dc3545", color: "#fff", border: "none", cursor: "pointer" }}
-                  >
-                    Удалить
-                  </button>
-                </div>
-              </li>
-            );
-          })
-        )}
-      </ul>
-    </div>
+          <div className="stats-row">
+            <div className="stat-card">
+              <div className="stat-value">{consultations.length}</div>
+              <div className="stat-label">Всего консультаций</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value">
+                {consultations.filter(
+                  (c) => (c.status || "").toLowerCase() === "active",
+                ).length}
+              </div>
+              <div className="stat-label">Активных</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value">
+                {consultations.filter(
+                  (c) => (c.status || "").toLowerCase() === "completed",
+                ).length}
+              </div>
+              <div className="stat-label">Завершённых</div>
+            </div>
+          </div>
+
+          <form
+            id="add-form"
+            onSubmit={handleAdd}
+            className="add-form card"
+            style={{ marginBottom: "2rem" }}
+          >
+            <h3 style={{ marginTop: 0, marginBottom: "1rem" }}>Добавить консультацию</h3>
+            <div className="form-grid">
+              <div className="form-group">
+                <label>Тема консультации</label>
+                <input
+                  type="text"
+                  placeholder="Например: Работа с тревожностью"
+                  value={form.topic}
+                  onChange={(e) => setForm({ ...form, topic: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Описание</label>
+                <input
+                  type="text"
+                  placeholder="Краткое описание проблемы"
+                  value={form.description}
+                  onChange={(e) =>
+                    setForm({ ...form, description: e.target.value })
+                  }
+                />
+              </div>
+              <div className="form-group">
+                <label>Длительность (мин)</label>
+                <input
+                  type="number"
+                  placeholder="60"
+                  value={form.duration}
+                  onChange={(e) => setForm({ ...form, duration: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Статус</label>
+                <select
+                  value={form.status}
+                  onChange={(e) => setForm({ ...form, status: e.target.value })}
+                >
+                  <option value="Активна">Активна</option>
+                  <option value="Завершена">Завершена</option>
+                  <option value="Доступна">Доступна</option>
+                  <option value="Занята">Занята</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Цена (руб.)</label>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={form.price}
+                  onChange={(e) => setForm({ ...form, price: e.target.value })}
+                />
+              </div>
+              <div className="form-group form-group-full">
+                <button type="submit" className="btn btn-primary">
+                  Создать консультацию
+                </button>
+              </div>
+            </div>
+          </form>
+
+          <div className="consultations-list">
+            {consultations.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-icon">📭</div>
+                <h3>Консультаций пока нет</h3>
+                <p>Добавьте первую консультацию, используя форму выше.</p>
+              </div>
+            ) : (
+              <ul className="cards-list">
+                {consultations.map((item) => {
+                  const isEditing = editingId === item.id;
+                  const key = statusKey(item);
+                  const color = STATUS_COLORS[key] || STATUS_COLORS.available;
+
+                  if (isEditing) {
+                    return (
+                      <li key={item.id} className="card editing-card">
+                        <form onSubmit={handleEditSave} className="edit-form">
+                          <div className="form-grid">
+                            <div className="form-group">
+                              <label>Тема</label>
+                              <input
+                                type="text"
+                                value={form.topic}
+                                onChange={(e) =>
+                                  setForm({ ...form, topic: e.target.value })
+                                }
+                                required
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label>Описание</label>
+                              <input
+                                type="text"
+                                value={form.description}
+                                onChange={(e) =>
+                                  setForm({
+                                    ...form,
+                                    description: e.target.value,
+                                  })
+                                }
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label>Длительность (мин)</label>
+                              <input
+                                type="number"
+                                value={form.duration}
+                                onChange={(e) =>
+                                  setForm({ ...form, duration: e.target.value })
+                                }
+                                required
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label>Статус</label>
+                              <select
+                                value={form.status}
+                                onChange={(e) =>
+                                  setForm({ ...form, status: e.target.value })
+                                }
+                              >
+                                <option value="Активна">Активна</option>
+                                <option value="Завершена">Завершена</option>
+                                <option value="Доступна">Доступна</option>
+                                <option value="Занята">Занята</option>
+                              </select>
+                            </div>
+                            <div className="form-group">
+                              <label>Цена (руб.)</label>
+                              <input
+                                type="number"
+                                value={form.price}
+                                onChange={(e) =>
+                                  setForm({ ...form, price: e.target.value })
+                                }
+                              />
+                            </div>
+                            <div className="form-group form-group-full">
+                              <div className="form-actions">
+                                <button
+                                  type="submit"
+                                  className="btn btn-success"
+                                >
+                                  Сохранить
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleEditCancel}
+                                  className="btn btn-outline"
+                                >
+                                  Отмена
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDelete(item.id)}
+                                  className="btn btn-danger btn-sm"
+                                  style={{ marginLeft: "0.5rem" }}
+                                >
+                                  Удалить
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </form>
+                      </li>
+                    );
+                  }
+
+                  return (
+                    <li key={item.id} className="card consultation-card">
+                      <div className="card-header">
+                        <div className="card-title-wrapper">
+                          <span
+                            className="status-badge"
+                            style={{
+                              background: `${color}15`,
+                              color: color,
+                              border: `1px solid ${color}40`,
+                            }}
+                          >
+                            {STATUS_LABELS[key] || key}
+                          </span>
+                          <h3 className="card-title">{item.topic}</h3>
+                        </div>
+                        <div className="card-meta">
+                          <span>💰 {item.price || 0} руб.</span>
+                          <span>⏱ {item.duration} мин</span>
+                        </div>
+                      </div>
+                      <div className="card-body">
+                        <p className="card-description">
+                          {item.description || "Описание не указано"}
+                        </p>
+                      </div>
+                      <div className="card-footer">
+                        <button
+                          className="btn btn-outline btn-sm"
+                          onClick={() => handleEditStart(item)}
+                        >
+                          Редактировать
+                        </button>
+                        <button
+                          className="btn btn-danger btn-sm"
+                          onClick={() => handleDelete(item.id)}
+                        >
+                          Удалить
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </>
+      )}
+    </section>
   );
 }
