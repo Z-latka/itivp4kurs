@@ -1,5 +1,6 @@
 require("dotenv").config();
 const express = require("express");
+const cors = require("cors");
 const app = express();
 const PORT = process.env.PORT || 3000;
 const { sequelize } = require("./models");
@@ -7,9 +8,14 @@ const consultationsRouter = require("./routes/consultations");
 const authRouter = require("./routes/auth");
 
 app.use(express.json());
+app.use(cors());
 
-app.use("/consultations", consultationsRouter);
-app.use("/auth", authRouter);
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", server: "psychology-api", port: PORT });
+});
+
+app.use("/api/consultations", consultationsRouter);
+app.use("/api/auth", authRouter);
 
 app.use((req, res) => {
   res.status(404).json({
@@ -30,10 +36,11 @@ sequelize
   .authenticate()
   .then(() => {
     console.log("База данных PostgreSQL успешно подключена.");
-    app.listen(PORT, () => {
-      console.log(`Сервер запущен на http://localhost:${PORT}`);
-    });
   })
   .catch((err) => {
     console.error("Ошибка подключения к базе данных:", err);
   });
+
+app.listen(PORT, () => {
+  console.log(`Сервер запущен на http://localhost:${PORT}`);
+});
