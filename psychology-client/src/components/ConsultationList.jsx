@@ -10,7 +10,7 @@ const INITIAL_FORM = {
   topic: "",
   description: "",
   duration: "",
-  status: "Активна",
+  status: "available",
   price: "",
 };
 
@@ -23,6 +23,8 @@ const requestWithRetry = async (fn, retries = 3, delayMs = 1000) => {
       return await fn();
     } catch (err) {
       lastError = err;
+      // Ошибки клиента (4xx) повторять бессмысленно: повтор нужен только при сбое сети или 5xx
+      if (err.response && err.response.status < 500) break;
       if (attempt < retries) {
         await DELAY(delayMs);
       }
@@ -116,7 +118,9 @@ export default function ConsultationsPage() {
       );
       setConsultations((prev) =>
         prev.map((item) =>
-          item.isOptimistic ? { ...response.data, isOptimistic: false } : item,
+          item.id === optimisticItem.id
+            ? { ...response.data, isOptimistic: false }
+            : item,
         ),
       );
     } catch (err) {
@@ -349,10 +353,10 @@ export default function ConsultationsPage() {
                   value={form.status}
                   onChange={(e) => setForm({ ...form, status: e.target.value })}
                 >
-                  <option value="Активна">Активна</option>
-                  <option value="Завершена">Завершена</option>
-                  <option value="Доступна">Доступна</option>
-                  <option value="Занята">Занята</option>
+                  <option value="active">Активна</option>
+                  <option value="completed">Завершена</option>
+                  <option value="available">Доступна</option>
+                  <option value="busy">Занята</option>
                 </select>
               </div>
               <div className="form-group">
@@ -434,10 +438,10 @@ export default function ConsultationsPage() {
                                   setForm({ ...form, status: e.target.value })
                                 }
                               >
-                                <option value="Активна">Активна</option>
-                                <option value="Завершена">Завершена</option>
-                                <option value="Доступна">Доступна</option>
-                                <option value="Занята">Занята</option>
+                                <option value="active">Активна</option>
+                                <option value="completed">Завершена</option>
+                                <option value="available">Доступна</option>
+                                <option value="busy">Занята</option>
                               </select>
                             </div>
                             <div className="form-group">

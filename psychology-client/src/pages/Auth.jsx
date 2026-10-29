@@ -27,9 +27,13 @@ export default function AuthPage() {
 
     try {
       if (mode === "login") {
-        await login({ email: form.email, password: form.password });
-        setSuccess("Вход выполнен успешно! Перенаправление...");
-        localStorage.setItem("auth_demo", "true");
+        const { data } = await login({
+          email: form.email,
+          password: form.password,
+        });
+        // JWT-токен сохраняется и затем подставляется перехватчиком axios
+        localStorage.setItem("token", data.token);
+        setSuccess("Вход выполнен успешно!");
       } else {
         await register({
           email: form.email,
