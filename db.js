@@ -8,7 +8,7 @@ const connectDB = async () => {
   }
 
   mongoose.connection.on("disconnected", () =>
-    console.warn("MongoDB: соединение потеряно"),
+    console.log("MongoDB disconnected"),
   );
 
   await mongoose.connect(uri, {
