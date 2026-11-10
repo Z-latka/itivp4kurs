@@ -1,13 +1,13 @@
 const express = require("express");
 const router = express.Router();
 const { Consultation, User, Booking } = require("../models");
-const { authenticateToken, isAdmin } = require("../middleware/auth");
+const { authenticateToken, isStaff } = require("../middleware/auth");
 
-const FIELDS = ["topic", "description", "duration", "status", "price", "specialist", "tags"];
+const FIELDS = ["topic", "description", "duration", "status", "price", "psychologist", "tags"];
 
 const pick = (body) =>
   Object.fromEntries(
-    FIELDS.filter((f) => body[f] !== undefined).map((f) => [f, body[f]]),
+    FIELDS.filter((f) => body[f] !== undefined).map((f) => [f, body[f] === "" ? null : body[f]]),
   );
 
 const notFound = (res, id) =>
@@ -16,25 +16,50 @@ const notFound = (res, id) =>
     message: `Консультация с ID ${id} не существует`,
   });
 
+const withPsychologist = (query) =>
+  query.populate("psychologist", Consultation.PSYCHOLOGIST_FIELDS);
+
+// Психолог управляет только своими консультациями, администратор — всеми
+const ownFilter = (req, id) =>
+  req.user.role === "admin" ? { _id: id } : { _id: id, psychologist: req.user.id };
+
+// Данные для записи: психолог всегда назначает консультацию себе,
+// администратор может указать любого активного психолога
+const prepareData = async (req, res) => {
+  const data = pick(req.body);
+  if (req.user.role === "psychologist") {
+    data.psychologist = req.user.id;
+  } else if (data.psychologist) {
+    const exists = await User.exists({ _id: data.psychologist, role: "psychologist" });
+    if (!exists) {
+      res.status(400).json({ message: "Указанный психолог не найден" });
+      return null;
+    }
+  }
+  return data;
+};
+
 // GET /consultations → Model.find()
-// Фильтры: ?tag=тревога (поиск по элементу массива), ?search=текст, ?maxPrice=100
+// Фильтры: ?tag=тревога (поиск по элементу массива), ?search=текст, ?maxPrice=100,
+// ?psychologist=<id> — консультации конкретного специалиста
 router.get("/", async (req, res, next) => {
   try {
     const filter = {};
     if (req.query.tag) filter.tags = req.query.tag;
+    if (req.query.psychologist) filter.psychologist = req.query.psychologist;
     if (req.query.search) {
       const re = new RegExp(req.query.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
-      filter.$or = [{ topic: re }, { description: re }, { specialist: re }];
+      filter.$or = [{ topic: re }, { description: re }];
     }
     if (req.query.maxPrice !== undefined) {
       filter.price = { $lte: Number(req.query.maxPrice) };
     }
 
-    const consultations = await Consultation.find(filter).sort({ createdAt: 1 });
+    const consultations = await withPsychologist(Consultation.find(filter).sort({ createdAt: 1 }));
     // В списке отдаём рейтинг и число отзывов, без самих отзывов
     res.json(
       consultations.map((c) => {
-        const json = c.toJSON();
+        const json = c.toClient();
         delete json.reviews;
         return json;
       }),
@@ -104,7 +129,7 @@ router.get("/reviews/latest", async (req, res, next) => {
   }
 });
 
-// Занятое время консультации в диапазоне дат: клиент показывает свободные слоты
+// Занятое время в диапазоне дат: клиент показывает только свободные слоты
 router.get("/:id/slots", async (req, res, next) => {
   try {
     const from = new Date(req.query.from || Date.now());
@@ -112,8 +137,13 @@ router.get("/:id/slots", async (req, res, next) => {
     if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
       return res.status(400).json({ message: "Некорректный диапазон дат" });
     }
+    const consultation = await Consultation.findById(req.params.id).select("psychologist");
+    if (!consultation) return notFound(res, req.params.id);
+    // Занятым считается время записей к этой консультации и к этому психологу
+    const owners = [{ consultation: consultation._id }];
+    if (consultation.psychologist) owners.push({ psychologist: consultation.psychologist });
     const busy = await Booking.find({
-      consultation: req.params.id,
+      $or: owners,
       status: { $ne: "cancelled" },
       scheduledAt: { $gte: from, $lte: to },
     }).distinct("scheduledAt");
@@ -126,9 +156,9 @@ router.get("/:id/slots", async (req, res, next) => {
 // GET /consultations/:id → Model.findById(id)
 router.get("/:id", async (req, res, next) => {
   try {
-    const consultation = await Consultation.findById(req.params.id);
+    const consultation = await withPsychologist(Consultation.findById(req.params.id));
     if (!consultation) return notFound(res, req.params.id);
-    const json = consultation.toJSON();
+    const json = consultation.toClient();
     json.reviews.sort((a, b) => b.createdAt - a.createdAt);
     res.json(json);
   } catch (err) {
@@ -137,26 +167,33 @@ router.get("/:id", async (req, res, next) => {
 });
 
 // POST /consultations → Model.create(body)
-router.post("/", authenticateToken, isAdmin, async (req, res, next) => {
+router.post("/", authenticateToken, isStaff, async (req, res, next) => {
   try {
-    const newConsultation = await Consultation.create(pick(req.body));
-    res.status(201).json(newConsultation);
+    const data = await prepareData(req, res);
+    if (!data) return;
+    const newConsultation = await Consultation.create(data);
+    await newConsultation.populate("psychologist", Consultation.PSYCHOLOGIST_FIELDS);
+    res.status(201).json(newConsultation.toClient());
   } catch (err) {
     next(err);
   }
 });
 
 // PUT /consultations/:id → Model.findByIdAndUpdate(id, body, { new: true })
-// (в Mongoose 9 опция new устарела, её эквивалент — returnDocument: "after")
-router.put("/:id", authenticateToken, isAdmin, async (req, res, next) => {
+// (в Mongoose 9 опция new устарела, её эквивалент — returnDocument: "after").
+// Психологу доступны только свои консультации — для него условие дополняется полем psychologist
+router.put("/:id", authenticateToken, isStaff, async (req, res, next) => {
   try {
-    const consultation = await Consultation.findByIdAndUpdate(
-      req.params.id,
-      pick(req.body),
-      { returnDocument: "after", runValidators: true },
+    const data = await prepareData(req, res);
+    if (!data) return;
+    const options = { returnDocument: "after", runValidators: true };
+    const consultation = await withPsychologist(
+      req.user.role === "admin"
+        ? Consultation.findByIdAndUpdate(req.params.id, data, options)
+        : Consultation.findOneAndUpdate(ownFilter(req, req.params.id), data, options),
     );
     if (!consultation) return notFound(res, req.params.id);
-    res.json(consultation);
+    res.json(consultation.toClient());
   } catch (err) {
     next(err);
   }
@@ -164,9 +201,12 @@ router.put("/:id", authenticateToken, isAdmin, async (req, res, next) => {
 
 // DELETE /consultations/:id → Model.findByIdAndDelete(id)
 // Возвращает удалённый документ; связанные записи удаляются хуком (каскад)
-router.delete("/:id", authenticateToken, isAdmin, async (req, res, next) => {
+router.delete("/:id", authenticateToken, isStaff, async (req, res, next) => {
   try {
-    const consultation = await Consultation.findByIdAndDelete(req.params.id);
+    const consultation =
+      req.user.role === "admin"
+        ? await Consultation.findByIdAndDelete(req.params.id)
+        : await Consultation.findOneAndDelete(ownFilter(req, req.params.id));
     if (!consultation) return notFound(res, req.params.id);
     res.json({
       message: "Консультация успешно удалена",
@@ -183,6 +223,9 @@ router.delete("/:id", authenticateToken, isAdmin, async (req, res, next) => {
 // Один отзыв на пользователя: условие "reviews.user": { $ne } не даёт добавить второй
 router.post("/:id/reviews", authenticateToken, async (req, res, next) => {
   try {
+    if (req.user.role !== "user") {
+      return res.status(403).json({ message: "Отзывы оставляют только клиенты" });
+    }
     const user = await User.findById(req.user.id).select("profile");
     const review = {
       user: req.user.id,
@@ -257,11 +300,11 @@ router.delete("/:id/reviews/:reviewId", authenticateToken, async (req, res, next
 // ===== Массив строк tags =====
 
 // $addToSet добавляет теги без дубликатов
-router.post("/:id/tags", authenticateToken, isAdmin, async (req, res, next) => {
+router.post("/:id/tags", authenticateToken, isStaff, async (req, res, next) => {
   try {
     const tags = [].concat(req.body.tags || req.body.tag || []).map(String);
-    const consultation = await Consultation.findByIdAndUpdate(
-      req.params.id,
+    const consultation = await Consultation.findOneAndUpdate(
+      ownFilter(req, req.params.id),
       { $addToSet: { tags: { $each: tags } } },
       { returnDocument: "after" },
     );
@@ -272,10 +315,10 @@ router.post("/:id/tags", authenticateToken, isAdmin, async (req, res, next) => {
   }
 });
 
-router.delete("/:id/tags/:tag", authenticateToken, isAdmin, async (req, res, next) => {
+router.delete("/:id/tags/:tag", authenticateToken, isStaff, async (req, res, next) => {
   try {
-    const consultation = await Consultation.findByIdAndUpdate(
-      req.params.id,
+    const consultation = await Consultation.findOneAndUpdate(
+      ownFilter(req, req.params.id),
       { $pull: { tags: req.params.tag } },
       { returnDocument: "after" },
     );

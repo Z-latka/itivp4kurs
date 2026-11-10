@@ -1,24 +1,28 @@
 const express = require("express");
 const router = express.Router();
 const { Question } = require("../models");
-const { authenticateToken, isAdmin } = require("../middleware/auth");
+const { authenticateToken, isPsychologist } = require("../middleware/auth");
 
 router.use(authenticateToken);
 
-// Псевдоним автора — единственное, что психолог знает о клиенте
-const withNickname = (query) => query.populate("user", "profile.nickname");
+// Автор виден психологу только по псевдониму, психолог клиенту — по имени
+const withPeople = (query) =>
+  query.populate("user", "profile.nickname").populate("psychologist", "specialist.fullName specialist.title");
 
 const serialize = (question) => {
   const json = question.toJSON();
   const author = question.user;
   json.user = author && author.profile ? { nickname: author.profile.nickname } : undefined;
+  const p = question.psychologist;
+  json.psychologist = p && p.specialist
+    ? { id: String(p._id), fullName: p.specialist.fullName, title: p.specialist.title }
+    : null;
   return json;
 };
 
-// Доступ к обращению есть только у автора и у психолога (admin)
-const loadOwned = async (req, res) => {
-  const question = await withNickname(Question.findById(req.params.id));
-  if (!question || (!question.isOwnedBy(req.user.id) && req.user.role !== "admin")) {
+const loadAccessible = async (req, res) => {
+  const question = await withPeople(Question.findById(req.params.id));
+  if (!question || !question.canAccess(req.user)) {
     res.status(404).json({ message: "Обращение не найдено" });
     return null;
   }
@@ -28,6 +32,9 @@ const loadOwned = async (req, res) => {
 // Новое обращение: первое сообщение сразу кладётся во вложенный массив
 router.post("/", async (req, res, next) => {
   try {
+    if (req.user.role !== "user") {
+      return res.status(403).json({ message: "Обращения создают только клиенты" });
+    }
     const topic = (req.body.topic || "").trim();
     const text = (req.body.text || "").trim();
     if (!topic || !text) {
@@ -48,18 +55,22 @@ router.post("/", async (req, res, next) => {
 
 router.get("/my", async (req, res, next) => {
   try {
-    const questions = await Question.find({ user: req.user.id }).sort({ updatedAt: -1 });
-    res.json(questions);
+    const questions = await withPeople(Question.find({ user: req.user.id }).sort({ updatedAt: -1 }));
+    res.json(questions.map(serialize));
   } catch (err) {
     next(err);
   }
 });
 
-// Все обращения (для психолога), фильтр ?status=open
-router.get("/", isAdmin, async (req, res, next) => {
+// Обращения для психолога: ?scope=queue — общая очередь (никто не взял),
+// ?scope=mine — взятые мной, без параметра — и те и другие
+router.get("/", isPsychologist, async (req, res, next) => {
   try {
-    const filter = req.query.status ? { status: req.query.status } : {};
-    const questions = await withNickname(Question.find(filter).sort({ updatedAt: -1 }));
+    const queue = { psychologist: null, status: { $ne: "closed" } };
+    const mine = { psychologist: req.user.id };
+    const filter =
+      req.query.scope === "queue" ? queue : req.query.scope === "mine" ? mine : { $or: [queue, mine] };
+    const questions = await withPeople(Question.find(filter).sort({ updatedAt: -1 }));
     res.json(questions.map(serialize));
   } catch (err) {
     next(err);
@@ -68,17 +79,38 @@ router.get("/", isAdmin, async (req, res, next) => {
 
 router.get("/:id", async (req, res, next) => {
   try {
-    const question = await loadOwned(req, res);
+    const question = await loadAccessible(req, res);
     if (question) res.json(serialize(question));
   } catch (err) {
     next(err);
   }
 });
 
-// Новое сообщение: $push в массив messages и смена статуса одной атомарной операцией
+// Взять обращение в работу. Условие psychologist: null делает операцию атомарной:
+// если двое психологов нажмут одновременно, обращение достанется только одному
+router.post("/:id/assign", isPsychologist, async (req, res, next) => {
+  try {
+    const question = await withPeople(
+      Question.findOneAndUpdate(
+        { _id: req.params.id, psychologist: null },
+        { psychologist: req.user.id },
+        { returnDocument: "after" },
+      ),
+    );
+    if (!question) {
+      return res.status(409).json({ message: "Обращение уже взял другой специалист" });
+    }
+    res.json(serialize(question));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Новое сообщение: $push в массив messages и смена статуса одной операцией.
+// Если психолог отвечает на обращение из очереди — оно закрепляется за ним
 router.post("/:id/messages", async (req, res, next) => {
   try {
-    const question = await loadOwned(req, res);
+    const question = await loadAccessible(req, res);
     if (!question) return;
     if (question.status === "closed") {
       return res.status(400).json({ message: "Обращение закрыто" });
@@ -87,16 +119,25 @@ router.post("/:id/messages", async (req, res, next) => {
     if (!text) {
       return res.status(400).json({ message: "Сообщение не может быть пустым" });
     }
-    const isPsychologist = req.user.role === "admin" && !question.isOwnedBy(req.user.id);
+    const fromPsychologist = req.user.role === "psychologist";
 
-    const updated = await Question.findByIdAndUpdate(
-      question._id,
-      {
-        $push: { messages: { authorRole: isPsychologist ? "psychologist" : "user", text } },
-        $set: { status: isPsychologist ? "answered" : "open" },
-      },
-      { returnDocument: "after", runValidators: true },
-    );
+    const filter = { _id: question._id };
+    const update = {
+      $push: { messages: { authorRole: fromPsychologist ? "psychologist" : "user", text } },
+      $set: { status: fromPsychologist ? "answered" : "open" },
+    };
+    if (fromPsychologist) {
+      filter.psychologist = { $in: [null, req.user.id] };
+      update.$set.psychologist = req.user.id;
+    }
+
+    const updated = await Question.findOneAndUpdate(filter, update, {
+      returnDocument: "after",
+      runValidators: true,
+    });
+    if (!updated) {
+      return res.status(409).json({ message: "Обращение уже взял другой специалист" });
+    }
     res.status(201).json(updated.messages.at(-1));
   } catch (err) {
     next(err);
@@ -105,7 +146,7 @@ router.post("/:id/messages", async (req, res, next) => {
 
 router.patch("/:id/close", async (req, res, next) => {
   try {
-    const question = await loadOwned(req, res);
+    const question = await loadAccessible(req, res);
     if (!question) return;
     question.status = "closed";
     await question.save();
@@ -115,11 +156,14 @@ router.patch("/:id/close", async (req, res, next) => {
   }
 });
 
-// Удаление обращения: переписка удаляется вместе с документом
+// Удаление обращения автором: переписка удаляется вместе с документом
 router.delete("/:id", async (req, res, next) => {
   try {
-    const question = await loadOwned(req, res);
+    const question = await loadAccessible(req, res);
     if (!question) return;
+    if (!question.isOwnedBy(req.user.id)) {
+      return res.status(403).json({ message: "Удалить обращение может только его автор" });
+    }
     const deleted = await Question.findByIdAndDelete(question._id);
     res.json({ message: "Обращение удалено", question: deleted });
   } catch (err) {

@@ -39,6 +39,20 @@ const moodSchema = new mongoose.Schema(
   { toJSON: toJSONOptions },
 );
 
+// Публичная анкета психолога — вложенный документ, есть только у роли psychologist
+const specialistSchema = new mongoose.Schema(
+  {
+    fullName: { type: String, required: [true, "Укажите имя специалиста"], trim: true, maxlength: 80 },
+    title: { type: String, trim: true, maxlength: 80 }, // «КПТ-терапевт»
+    experienceYears: { type: Number, min: 0, max: 60 },
+    education: { type: String, trim: true, maxlength: 300 },
+    approach: { type: String, trim: true, maxlength: 120 }, // метод работы
+    about: { type: String, trim: true, maxlength: 2000 },
+    topics: [String],
+  },
+  { _id: false },
+);
+
 const userSchema = new mongoose.Schema(
   {
     email: {
@@ -50,8 +64,11 @@ const userSchema = new mongoose.Schema(
       match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Некорректный email"],
     },
     passwordHash: { type: String, required: true },
-    role: { type: String, enum: ["user", "admin"], default: "user" },
+    role: { type: String, enum: ["user", "psychologist", "admin"], default: "user", index: true },
+    // Отключённый сотрудник не может войти и не показывается клиентам
+    active: { type: Boolean, default: true },
     profile: { type: profileSchema, default: () => ({}) },
+    specialist: { type: specialistSchema, default: undefined },
     testResults: [testResultSchema],
     moods: [moodSchema],
   },
@@ -68,9 +85,16 @@ userSchema.methods.toPublic = function toPublic() {
     email: this.email,
     nickname: this.profile?.nickname,
     profile: this.profile,
+    specialist: this.specialist,
     role: this.role,
+    active: this.active,
     createdAt: this.createdAt,
   };
+};
+
+// Карточка психолога для клиентов: без email и служебных полей
+userSchema.methods.toSpecialistCard = function toSpecialistCard() {
+  return { id: this.id, ...(this.specialist?.toObject?.() || this.specialist || {}) };
 };
 
 // Статический метод модели

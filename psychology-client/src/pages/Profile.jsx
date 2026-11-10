@@ -514,7 +514,9 @@ function OverviewTab({ bookings, results }) {
 export default function ProfilePage({ query = {} }) {
   const { user } = useAuth();
   const toast = useToast();
-  const tab = TABS[query.tab] ? query.tab : "overview";
+  // Сотрудникам в кабинете нужны только настройки аккаунта
+  const tabs = user.role === "user" ? TABS : { settings: TABS.settings };
+  const tab = tabs[query.tab] ? query.tab : Object.keys(tabs)[0];
   const [bookings, setBookings] = useState([]);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -557,7 +559,7 @@ export default function ProfilePage({ query = {} }) {
       </div>
 
       <div className="tabs" role="tablist">
-        {Object.entries(TABS).map(([key, t]) => {
+        {Object.entries(tabs).map(([key, t]) => {
           const Icon = t.icon;
           return (
             <button

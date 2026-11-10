@@ -1,267 +1,317 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   CalendarDays,
-  ClipboardList,
-  Inbox,
+  LayoutDashboard,
   LayoutList,
   Lock,
   MessageCircle,
-  Search,
+  Pencil,
+  Stethoscope,
+  UserPlus,
   Users,
 } from "lucide-react";
 import {
+  adminCreatePsychologist,
+  adminFetchPsychologists,
+  adminUpdatePsychologist,
   errorMessage,
-  fetchAllBookings,
-  fetchAllQuestions,
-  fetchStats,
-  setBookingStatus,
+  fetchAdminStats,
 } from "../api";
 import { navigate } from "../router";
-import { useAuth } from "../auth/context";
 import { useToast } from "../toast/context";
+import BookingsBoard from "../components/BookingsBoard";
 import ConsultationsPage from "../components/ConsultationList";
-import { Badge, EmptyState, Loader, PageHeader } from "../components/ui";
-import { QuestionRow } from "./Questions";
-import { BOOKING_STATUS, FORMATS, formatTime } from "../labels";
-
-const bid = (b) => b.id || b._id;
-
-const dayKey = (d) => new Date(d).toDateString();
-const dayTitle = (d) => {
-  const date = new Date(d);
-  const today = new Date();
-  const tomorrow = new Date();
-  tomorrow.setDate(today.getDate() + 1);
-  if (dayKey(date) === dayKey(today)) return "Сегодня";
-  if (dayKey(date) === dayKey(tomorrow)) return "Завтра";
-  return date.toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" });
-};
-
-function BookingsTab() {
-  const toast = useToast();
-  const [bookings, setBookings] = useState([]);
-  const [filter, setFilter] = useState("active");
-  const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    fetchAllBookings()
-      .then(({ data }) => setBookings(data))
-      .catch((err) => setError(errorMessage(err)))
-      .finally(() => setLoading(false));
-  }, []);
-
-  const changeStatus = async (booking, status) => {
-    try {
-      await setBookingStatus(bid(booking), status);
-      setBookings((prev) => prev.map((b) => (bid(b) === bid(booking) ? { ...b, status } : b)));
-      toast(`Статус: ${BOOKING_STATUS[status].label.toLowerCase()}`);
-    } catch (err) {
-      toast(errorMessage(err, "Не удалось изменить статус"), "error");
-    }
-  };
-
-  // Группировка по дням для удобного расписания
-  const groups = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const list = bookings.filter((b) => {
-      if (filter === "active" && !["pending", "confirmed"].includes(b.status)) return false;
-      if (filter !== "active" && filter !== "all" && b.status !== filter) return false;
-      return !q || [b.user?.nickname, b.consultation?.topic, b.comment].join(" ").toLowerCase().includes(q);
-    });
-    const map = new Map();
-    list.forEach((b) => {
-      const key = dayKey(b.scheduledAt);
-      if (!map.has(key)) map.set(key, { date: b.scheduledAt, items: [] });
-      map.get(key).items.push(b);
-    });
-    return [...map.values()];
-  }, [bookings, filter, search]);
-
-  const pendingCount = bookings.filter((b) => b.status === "pending").length;
-
-  return (
-    <>
-      <div className="filters">
-        <div className="filters-top">
-          <label className="input-icon">
-            <span className="sr-only">Поиск</span>
-            <Search size={18} />
-            <input
-              className="input"
-              type="search"
-              placeholder="Псевдоним, тема или комментарий"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </label>
-          <select className="input" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Статус">
-            <option value="active">Активные</option>
-            <option value="pending">Ожидают подтверждения ({pendingCount})</option>
-            <option value="confirmed">Подтверждённые</option>
-            <option value="completed">Завершённые</option>
-            <option value="cancelled">Отменённые</option>
-            <option value="all">Все записи</option>
-          </select>
-        </div>
-      </div>
-      {error && <div className="alert alert-error">{error}</div>}
-      {loading && <Loader />}
-      {!loading && groups.length === 0 && (
-        <EmptyState icon={CalendarDays} title="Записей нет" text="Под выбранные условия ничего не подходит." />
-      )}
-      {groups.map((g) => (
-        <div key={g.date} style={{ marginBottom: "1.75rem" }}>
-          <h3 style={{ textTransform: "capitalize" }}>{dayTitle(g.date)}</h3>
-          <ul className="list">
-            {g.items.map((b) => {
-              const status = BOOKING_STATUS[b.status] || BOOKING_STATUS.pending;
-              const Format = FORMATS[b.format]?.icon;
-              return (
-                <li key={bid(b)} className="card list-row">
-                  <div className="date-tile">
-                    <strong style={{ fontSize: "1rem" }}>{formatTime(b.scheduledAt)}</strong>
-                  </div>
-                  <div className="list-row-main">
-                    <strong className="ellipsis">{b.consultation?.topic || "Консультация удалена"}</strong>
-                    <span className="meta-row">
-                      <span><Users size={14} /> {b.user?.nickname || "Аноним"}</span>
-                      {Format && <span><Format size={14} /> {FORMATS[b.format].label}</span>}
-                    </span>
-                    {b.comment && <span className="small">«{b.comment}»</span>}
-                  </div>
-                  <div className="list-row-side">
-                    <Badge color={status.color}>{status.label}</Badge>
-                    {b.status === "pending" && (
-                      <button className="btn btn-primary btn-sm" onClick={() => changeStatus(b, "confirmed")}>
-                        Подтвердить
-                      </button>
-                    )}
-                    <select
-                      value={b.status}
-                      onChange={(e) => changeStatus(b, e.target.value)}
-                      aria-label="Изменить статус"
-                    >
-                      {Object.entries(BOOKING_STATUS).map(([value, s]) => (
-                        <option key={value} value={value}>{s.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ))}
-    </>
-  );
-}
-
-function QuestionsTab() {
-  const [questions, setQuestions] = useState([]);
-  const [filter, setFilter] = useState("open");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    fetchAllQuestions()
-      .then(({ data }) => setQuestions(data))
-      .catch((err) => setError(errorMessage(err)))
-      .finally(() => setLoading(false));
-  }, []);
-
-  const counts = useMemo(() => {
-    const c = { all: questions.length, open: 0, answered: 0, closed: 0 };
-    questions.forEach((q) => (c[q.status] += 1));
-    return c;
-  }, [questions]);
-
-  const visible = questions.filter((q) => filter === "all" || q.status === filter);
-
-  return (
-    <>
-      <div className="segmented" style={{ marginBottom: "1.25rem" }}>
-        {[
-          ["open", "Ждут ответа"],
-          ["answered", "Отвечено"],
-          ["closed", "Закрыты"],
-          ["all", "Все"],
-        ].map(([key, label]) => (
-          <button key={key} className={filter === key ? "active" : ""} onClick={() => setFilter(key)}>
-            {label} · {counts[key]}
-          </button>
-        ))}
-      </div>
-      {error && <div className="alert alert-error">{error}</div>}
-      {loading && <Loader />}
-      {!loading && visible.length === 0 && (
-        <EmptyState
-          icon={Inbox}
-          title={filter === "open" ? "Все вопросы отвечены" : "Обращений нет"}
-          text={filter === "open" ? "Новые обращения появятся здесь." : undefined}
-        />
-      )}
-      <ul className="list">
-        {visible.map((q) => (
-          <QuestionRow key={q.id || q._id} question={q} showAuthor />
-        ))}
-      </ul>
-    </>
-  );
-}
+import ConfirmDialog from "../components/ConfirmDialog";
+import { Avatar, Badge, EmptyState, Loader, PageHeader } from "../components/ui";
+import { BOOKING_STATUS, QUESTION_STATUS, formatDate } from "../labels";
 
 const TABS = {
-  bookings: { label: "Расписание", icon: CalendarDays },
-  questions: { label: "Обращения", icon: MessageCircle },
-  catalog: { label: "Каталог консультаций", icon: LayoutList },
+  overview: { label: "Обзор", icon: LayoutDashboard },
+  psychologists: { label: "Психологи", icon: Stethoscope },
+  catalog: { label: "Каталог", icon: LayoutList },
+  bookings: { label: "Все записи", icon: CalendarDays },
 };
 
-export default function AdminPage({ query = {} }) {
-  const { isAdmin } = useAuth();
-  const tab = TABS[query.tab] ? query.tab : "bookings";
+function Bars({ data, labels }) {
+  const entries = Object.entries(labels).map(([key, l]) => [l, data[key] || 0]);
+  const max = Math.max(1, ...entries.map(([, v]) => v));
+  return (
+    <div className="bar-list">
+      {entries.map(([l, v]) => (
+        <div key={l.label} className="bar-row">
+          <span>{l.label}</span>
+          <strong>{v}</strong>
+          <div className="bar"><div style={{ width: `${(v / max) * 100}%`, background: l.color }} /></div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function OverviewTab() {
   const [stats, setStats] = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (isAdmin) fetchStats().then(({ data }) => setStats(data)).catch(() => {});
-  }, [isAdmin]);
+    fetchAdminStats()
+      .then(({ data }) => setStats(data))
+      .catch((err) => setError(errorMessage(err)));
+  }, []);
 
-  if (!isAdmin) {
-    return (
-      <section className="page">
-        <EmptyState icon={Lock} title="Раздел доступен только психологам">
-          <button className="btn btn-primary" onClick={() => navigate("")}>На главную</button>
-        </EmptyState>
-      </section>
-    );
-  }
+  if (error) return <div className="alert alert-error">{error}</div>;
+  if (!stats) return <Loader />;
 
-  const tiles = stats && [
-    { icon: Users, value: stats.users, label: "Пользователей" },
-    { icon: CalendarDays, value: stats.bookings, label: "Записей всего" },
-    { icon: MessageCircle, value: stats.openQuestions, label: "Ждут ответа", warm: true },
-    { icon: ClipboardList, value: stats.testsTaken, label: "Тестов пройдено" },
+  const tiles = [
+    { icon: Users, value: stats.users.user || 0, label: "Клиентов" },
+    { icon: Stethoscope, value: stats.users.psychologist || 0, label: "Психологов" },
+    {
+      icon: CalendarDays,
+      value: Object.values(stats.bookings).reduce((a, b) => a + b, 0),
+      label: "Записей всего",
+    },
+    { icon: MessageCircle, value: stats.questions.queue, label: "Вопросов без психолога", warm: stats.questions.queue > 0 },
   ];
 
   return (
-    <section className="page">
-      <PageHeader eyebrow="Панель психолога" title="Рабочее место" subtitle="Расписание встреч, анонимные обращения и каталог услуг." />
-      {tiles && (
-        <div className="stats-row">
-          {tiles.map((t) => {
-            const Icon = t.icon;
-            return (
-              <div key={t.label} className="stat-card">
-                <div className={`icon-tile${t.warm ? " warm" : ""}`}><Icon size={20} /></div>
-                <div>
-                  <div className="stat-value">{t.value}</div>
-                  <div className="stat-label">{t.label}</div>
-                </div>
+    <>
+      <div className="stats-row">
+        {tiles.map((t) => {
+          const Icon = t.icon;
+          return (
+            <div key={t.label} className="stat-card">
+              <div className={`icon-tile${t.warm ? " warm" : ""}`}><Icon size={20} /></div>
+              <div>
+                <div className="stat-value">{t.value}</div>
+                <div className="stat-label">{t.label}</div>
               </div>
-            );
-          })}
+            </div>
+          );
+        })}
+      </div>
+      <div className="grid-3">
+        <div className="card">
+          <h3>Записи по статусам</h3>
+          <Bars data={stats.bookings} labels={BOOKING_STATUS} />
         </div>
+        <div className="card">
+          <h3>Обращения</h3>
+          <Bars data={stats.questions} labels={QUESTION_STATUS} />
+          <p className="hint mt mb-0">
+            <Lock size={12} /> Содержание переписки администратору недоступно — оно конфиденциально.
+          </p>
+        </div>
+        <div className="card">
+          <h3>Популярные консультации</h3>
+          {stats.popular.length === 0 ? (
+            <p className="muted mb-0">Записей пока нет.</p>
+          ) : (
+            <ol style={{ margin: 0, paddingLeft: "1.2rem" }}>
+              {stats.popular.map((p) => (
+                <li key={p.id} style={{ marginBottom: "0.4rem" }}>
+                  <a href={`#/consultations/${p.id}`}>{p.topic}</a>{" "}
+                  <span className="muted small">— {p.bookings}</span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+const EMPTY_PSY = { email: "", password: "", fullName: "", title: "", experienceYears: "", approach: "" };
+
+function PsychologistForm({ initial, onSaved, onCancel }) {
+  const toast = useToast();
+  const editing = Boolean(initial);
+  const [form, setForm] = useState(
+    initial
+      ? {
+          fullName: initial.fullName || "",
+          title: initial.title || "",
+          experienceYears: initial.experienceYears ?? "",
+          approach: initial.approach || "",
+        }
+      : EMPTY_PSY,
+  );
+  const [saving, setSaving] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    const payload = {
+      ...form,
+      experienceYears: form.experienceYears === "" ? undefined : Number(form.experienceYears),
+    };
+    try {
+      if (editing) {
+        await adminUpdatePsychologist(initial.id, payload);
+        toast("Анкета обновлена");
+      } else {
+        await adminCreatePsychologist(payload);
+        toast(`Аккаунт ${form.email} создан`);
+      }
+      onSaved();
+    } catch (err) {
+      toast(errorMessage(err), "error");
+      setSaving(false);
+    }
+  };
+
+  const input = (name, label, props = {}) => (
+    <div className="form-group">
+      <label htmlFor={`psy-${name}`}>{label}</label>
+      <input
+        id={`psy-${name}`}
+        value={form[name]}
+        onChange={(e) => setForm({ ...form, [name]: e.target.value })}
+        {...props}
+      />
+    </div>
+  );
+
+  return (
+    <form className="card mb-0" onSubmit={submit} style={{ marginBottom: "1.5rem" }}>
+      <h3>{editing ? `Анкета: ${initial.fullName}` : "Новый психолог"}</h3>
+      <div className="form-grid mt-sm">
+        {!editing && input("email", "Email для входа", { type: "email", required: true, autoComplete: "off" })}
+        {!editing && input("password", "Временный пароль", { type: "text", required: true, minLength: 6, autoComplete: "off" })}
+        {input("fullName", "Имя и фамилия", { required: true, maxLength: 80 })}
+        {input("title", "Специализация", { maxLength: 80, placeholder: "КПТ-терапевт" })}
+        {input("experienceYears", "Опыт, лет", { type: "number", min: 0, max: 60 })}
+        {input("approach", "Метод работы", { maxLength: 120 })}
+      </div>
+      {!editing && (
+        <p className="hint">Передайте психологу email и временный пароль — он сменит пароль в настройках и дополнит анкету сам.</p>
       )}
+      <div className="form-actions">
+        <button className="btn btn-primary" disabled={saving}>{editing ? "Сохранить" : "Создать аккаунт"}</button>
+        <button type="button" className="btn btn-ghost" onClick={onCancel}>Отмена</button>
+      </div>
+    </form>
+  );
+}
+
+function PsychologistsTab() {
+  const toast = useToast();
+  const [list, setList] = useState(null);
+  const [mode, setMode] = useState(null); // null | "new" | объект психолога
+  const [toToggle, setToToggle] = useState(null);
+
+  const load = useCallback(
+    () =>
+      adminFetchPsychologists()
+        .then(({ data }) => setList(data))
+        .catch((err) => toast(errorMessage(err), "error")),
+    [toast],
+  );
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const toggle = async () => {
+    const p = toToggle;
+    setToToggle(null);
+    try {
+      await adminUpdatePsychologist(p.id, { active: !p.active });
+      toast(p.active ? `${p.fullName}: аккаунт отключён` : `${p.fullName}: аккаунт включён`);
+      load();
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    }
+  };
+
+  return (
+    <>
+      <div className="row-between" style={{ marginBottom: "1.25rem" }}>
+        <p className="muted mb-0">Аккаунты психологов создаёт только администратор — самостоятельная регистрация специалистов закрыта.</p>
+        {!mode && (
+          <button className="btn btn-primary" onClick={() => setMode("new")}>
+            <UserPlus size={16} /> Добавить психолога
+          </button>
+        )}
+      </div>
+      {mode && (
+        <PsychologistForm
+          key={mode === "new" ? "new" : mode.id}
+          initial={mode === "new" ? null : mode}
+          onSaved={() => {
+            setMode(null);
+            load();
+          }}
+          onCancel={() => setMode(null)}
+        />
+      )}
+      {!list && <Loader />}
+      {list && list.length === 0 && <EmptyState icon={Stethoscope} title="Психологов пока нет" />}
+      <ul className="list mt">
+        {list?.map((p) => (
+          <li key={p.id} className={`card list-row staff-row${p.active ? "" : " inactive"}`}>
+            <Avatar name={p.fullName} />
+            <div className="list-row-main">
+              <strong>{p.fullName}</strong>
+              <span className="muted small">{p.title} · {p.email}</span>
+              <span className="muted xsmall">
+                Консультаций: {p.consultations} · предстоящих записей: {p.upcoming} · с {formatDate(p.createdAt, false)}
+              </span>
+            </div>
+            <div className="list-row-side">
+              <Badge color={p.active ? "#2e7d4f" : "#8a948f"}>{p.active ? "Активен" : "Отключён"}</Badge>
+              <button className="btn btn-ghost btn-sm" onClick={() => setMode(p)}>
+                <Pencil size={14} /> Анкета
+              </button>
+              <button
+                className={`btn btn-sm ${p.active ? "btn-ghost btn-danger-ghost" : "btn-soft"}`}
+                onClick={() => setToToggle(p)}
+              >
+                {p.active ? "Отключить" : "Включить"}
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <ConfirmDialog
+        open={Boolean(toToggle)}
+        title={toToggle?.active ? "Отключить психолога?" : "Включить психолога?"}
+        text={
+          toToggle?.active
+            ? "Он не сможет войти, исчезнет со страницы специалистов, а запись на его консультации закроется."
+            : "Психолог снова сможет входить, а его консультации откроются для записи."
+        }
+        confirmLabel={toToggle?.active ? "Отключить" : "Включить"}
+        danger={toToggle?.active}
+        onConfirm={toggle}
+        onCancel={() => setToToggle(null)}
+      />
+    </>
+  );
+}
+
+function CatalogTab() {
+  const [psychologists, setPsychologists] = useState(null);
+
+  useEffect(() => {
+    adminFetchPsychologists()
+      .then(({ data }) => setPsychologists(data.filter((p) => p.active)))
+      .catch(() => setPsychologists([]));
+  }, []);
+
+  if (!psychologists) return <Loader />;
+  return <ConsultationsPage psychologists={psychologists} />;
+}
+
+export default function AdminPage({ query = {} }) {
+  const tab = TABS[query.tab] ? query.tab : "overview";
+
+  return (
+    <section className="page">
+      <PageHeader
+        eyebrow="Администрирование"
+        title="Управление сервисом"
+        subtitle="Специалисты, каталог консультаций, записи и статистика."
+      />
       <div className="tabs" role="tablist">
         {Object.entries(TABS).map(([key, t]) => {
           const Icon = t.icon;
@@ -271,17 +321,17 @@ export default function AdminPage({ query = {} }) {
               role="tab"
               aria-selected={tab === key}
               className={`tab${tab === key ? " active" : ""}`}
-              onClick={() => navigate(`admin?tab=${key}`)}
+              onClick={() => navigate(key === "overview" ? "admin" : `admin?tab=${key}`)}
             >
               <Icon size={16} /> {t.label}
-              {key === "questions" && stats?.openQuestions > 0 && <span className="count">{stats.openQuestions}</span>}
             </button>
           );
         })}
       </div>
-      {tab === "bookings" && <BookingsTab />}
-      {tab === "questions" && <QuestionsTab />}
-      {tab === "catalog" && <ConsultationsPage />}
+      {tab === "overview" && <OverviewTab />}
+      {tab === "psychologists" && <PsychologistsTab />}
+      {tab === "catalog" && <CatalogTab />}
+      {tab === "bookings" && <BookingsBoard showPsychologist />}
     </section>
   );
 }

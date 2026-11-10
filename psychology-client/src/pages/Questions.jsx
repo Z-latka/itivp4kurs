@@ -10,6 +10,7 @@ import {
   UserRound,
 } from "lucide-react";
 import {
+  assignQuestion,
   closeQuestion,
   createQuestion,
   errorMessage,
@@ -87,6 +88,7 @@ export function QuestionRow({ question, showAuthor = false }) {
         )}
         <span className="muted xsmall">
           {showAuthor && author ? `${author} · ` : ""}
+          {!showAuthor && question.psychologist ? `${question.psychologist.fullName} · ` : ""}
           {formatDate(question.updatedAt)} · сообщений: {question.messages?.length || 0}
         </span>
       </div>
@@ -186,7 +188,7 @@ function QuestionsList() {
 }
 
 function Thread({ id }) {
-  const { user, isAdmin } = useAuth();
+  const { user, isPsychologist } = useAuth();
   const toast = useToast();
   const [question, setQuestion] = useState(null);
   const [error, setError] = useState(null);
@@ -228,7 +230,18 @@ function Thread({ id }) {
   if (!question) return <Loader />;
 
   const isOwner = String(question.userId) === String(user.id);
-  const asPsychologist = isAdmin && !isOwner;
+  const asPsychologist = isPsychologist && !isOwner;
+  const unassigned = !question.psychologist;
+
+  const handleTake = async () => {
+    try {
+      await assignQuestion(id);
+      toast("Обращение закреплено за вами");
+      await load();
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    }
+  };
   const status = QUESTION_STATUS[question.status] || QUESTION_STATUS.open;
 
   const handleSend = async (e) => {
@@ -257,7 +270,7 @@ function Thread({ id }) {
     }
   };
 
-  const backTo = asPsychologist ? "admin?tab=questions" : "ask";
+  const backTo = asPsychologist ? "work?tab=questions" : "ask";
 
   return (
     <section className="page">
@@ -278,6 +291,10 @@ function Thread({ id }) {
             <span className="muted small">
               {asPsychologist && `Клиент: ${question.user?.nickname || "Аноним"} · `}
               Создано {formatDate(question.createdAt)}
+              {!asPsychologist &&
+                (question.psychologist
+                  ? ` · Отвечает: ${question.psychologist.fullName}`
+                  : " · Ждёт свободного специалиста")}
             </span>
           </div>
           <Badge color={status.color}>{status.label}</Badge>
@@ -291,7 +308,13 @@ function Thread({ id }) {
               <div key={m.id || m._id || i} className={`message${mine ? " mine" : ""}`}>
                 <div className="message-author">
                   {fromPsychologist ? <Stethoscope size={13} /> : <UserRound size={13} />}
-                  {fromPsychologist ? "Психолог" : asPsychologist ? question.user?.nickname || "Клиент" : "Вы"}
+                  {fromPsychologist
+                    ? asPsychologist
+                      ? "Вы"
+                      : question.psychologist?.fullName || "Психолог"
+                    : asPsychologist
+                      ? question.user?.nickname || "Клиент"
+                      : "Вы"}
                 </div>
                 <div className="message-text">{m.text}</div>
                 <div className="message-time">{formatDate(m.createdAt)}</div>
@@ -303,6 +326,15 @@ function Thread({ id }) {
           )}
           <div ref={endRef} />
         </div>
+
+        {asPsychologist && unassigned && question.status !== "closed" && (
+          <div className="alert alert-info" style={{ alignItems: "center" }}>
+            <span>Обращение в общей очереди. Возьмите его, чтобы вести переписку — после этого его увидите только вы.</span>
+            <button className="btn btn-primary btn-sm" style={{ marginLeft: "auto" }} onClick={handleTake}>
+              Взять в работу
+            </button>
+          </div>
+        )}
 
         {question.status === "closed" ? (
           <div className="composer">
@@ -353,5 +385,24 @@ function Thread({ id }) {
 export default function QuestionsPage({ param }) {
   const { user } = useAuth();
   if (!user) return <Intro />;
+  if (user.role !== "user" && !param) {
+    return (
+      <section className="page">
+        <EmptyState
+          icon={Lock}
+          title={user.role === "psychologist" ? "Обращения клиентов — в рабочем месте" : "Переписка конфиденциальна"}
+          text={
+            user.role === "psychologist"
+              ? "Общая очередь и ваши обращения находятся на вкладке «Обращения»."
+              : "Анонимные обращения видят только клиент и психолог, который его ведёт."
+          }
+        >
+          {user.role === "psychologist" && (
+            <button className="btn btn-primary" onClick={() => navigate("work?tab=questions")}>Открыть обращения</button>
+          )}
+        </EmptyState>
+      </section>
+    );
+  }
   return param ? <Thread key={param} id={param} /> : <QuestionsList />;
 }

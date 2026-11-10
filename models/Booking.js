@@ -1,8 +1,8 @@
 const mongoose = require("mongoose");
 const { toJSONOptions } = require("./toJSON");
 
-// Запись хранится отдельной коллекцией со ссылками (ref) на пользователя
-// и консультацию: у записи свой жизненный цикл, её ищут независимо.
+// Запись хранится отдельной коллекцией со ссылками (ref) на пользователя,
+// консультацию и психолога: у записи свой жизненный цикл, её ищут независимо.
 // Связанные документы подтягиваются через populate
 const bookingSchema = new mongoose.Schema(
   {
@@ -12,6 +12,8 @@ const bookingSchema = new mongoose.Schema(
       ref: "Consultation",
       required: true,
     },
+    // Копия ссылки из консультации: расписание психолога ищется по одному индексу
+    psychologist: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
     scheduledAt: { type: Date, required: [true, "Укажите дату и время"] },
     format: { type: String, enum: ["chat", "video", "audio"], default: "chat" },
     comment: { type: String, trim: true, maxlength: 1000 },

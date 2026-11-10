@@ -60,7 +60,7 @@ const slotDate = (day, hour) => {
 const isTooSoon = (date) => date.getTime() < Date.now() + 60 * 60 * 1000;
 
 function CatalogList({ query }) {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isPsychologist } = useAuth();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -109,8 +109,11 @@ function CatalogList({ query }) {
         title="Выберите направление"
         subtitle="Все встречи проходят онлайн и анонимно. Не уверены, с чего начать? Выберите бесплатную первичную консультацию."
       >
-        {isAdmin && (
-          <button className="btn btn-outline" onClick={() => navigate("admin?tab=catalog")}>
+        {(isAdmin || isPsychologist) && (
+          <button
+            className="btn btn-outline"
+            onClick={() => navigate(isAdmin ? "admin?tab=catalog" : "work?tab=consultations")}
+          >
             <Settings size={16} /> Управление каталогом
           </button>
         )}
@@ -200,6 +203,15 @@ function BookingPanel({ consultation }) {
   useEffect(() => {
     loadBusy();
   }, [loadBusy]);
+
+  if (user && user.role !== "user") {
+    return (
+      <div className="card side-card">
+        <h3>Запись доступна клиентам</h3>
+        <p className="muted mb-0">Вы вошли как сотрудник сервиса. Записи клиентов — в разделе «{user.role === "admin" ? "Администрирование" : "Рабочее место"}».</p>
+      </div>
+    );
+  }
 
   if (!isBookable(consultation)) {
     return (
@@ -407,7 +419,7 @@ function ReviewForm({ initial, onSubmit, onCancel }) {
 }
 
 function Reviews({ item, setItem }) {
-  const { user } = useAuth();
+  const { user, isClient } = useAuth();
   const toast = useToast();
   const [editing, setEditing] = useState(false);
   const [writing, setWriting] = useState(false);
@@ -454,7 +466,7 @@ function Reviews({ item, setItem }) {
             </span>
           )}
         </div>
-        {user && !mine && !writing && (
+        {isClient && !mine && !writing && (
           <button className="btn btn-soft btn-sm" onClick={() => setWriting(true)}>
             <Pencil size={15} /> Написать отзыв
           </button>
@@ -549,7 +561,7 @@ function ConsultationDetail({ id }) {
             <p style={{ fontSize: "1.05rem" }}>{item.description}</p>
 
             {item.specialist && (
-              <div className="card card-soft mt">
+              <div className="card card-soft mt row-between">
                 <div className="specialist mb-0">
                   <Avatar name={name} large />
                   <div>
@@ -557,6 +569,11 @@ function ConsultationDetail({ id }) {
                     {role && <span>{role}</span>}
                   </div>
                 </div>
+                {item.psychologist?.id && (
+                  <button className="btn btn-ghost btn-sm" onClick={() => navigate(`specialists/${item.psychologist.id}`)}>
+                    Анкета специалиста
+                  </button>
+                )}
               </div>
             )}
 

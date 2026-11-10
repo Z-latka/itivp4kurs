@@ -38,6 +38,10 @@ export default function AuthProvider({ children }) {
       user,
       checking,
       isAdmin: user?.role === "admin",
+      isPsychologist: user?.role === "psychologist",
+      isClient: user?.role === "user",
+      // Домашняя страница пользователя после входа зависит от роли
+      homePage: user?.role === "admin" ? "admin" : user?.role === "psychologist" ? "work" : "profile",
       signIn,
       signOut,
       setUser,

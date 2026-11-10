@@ -31,7 +31,8 @@ const consultationSchema = new mongoose.Schema(
       default: "available",
     },
     price: { type: Number, default: 0, min: 0 },
-    specialist: { type: String, trim: true },
+    // Ссылка на аккаунт психолога (отдельная коллекция users) — подставляется через populate
+    psychologist: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
     tags: { type: [String], index: true }, // массив строк + индекс
     reviews: [reviewSchema],
   },
@@ -52,6 +53,23 @@ consultationSchema.virtual("rating").get(function rating() {
 consultationSchema.virtual("reviewsCount").get(function reviewsCount() {
   return this.reviews ? this.reviews.length : undefined;
 });
+
+// Поля психолога, которые подставляются через populate
+consultationSchema.statics.PSYCHOLOGIST_FIELDS = "specialist.fullName specialist.title active";
+
+// Представление для клиента: вместо ObjectId — имя и специализация психолога.
+// Работает и без populate (тогда остаётся только id)
+consultationSchema.methods.toClient = function toClient() {
+  const json = this.toJSON();
+  const p = this.psychologist;
+  if (p && p.specialist) {
+    json.psychologist = { id: String(p._id), fullName: p.specialist.fullName, title: p.specialist.title };
+    json.specialist = [p.specialist.fullName, p.specialist.title].filter(Boolean).join(", ");
+  } else {
+    json.psychologist = p ? { id: String(p._id || p) } : null;
+  }
+  return json;
+};
 
 // Статический метод: поиск по тегу (поле-массив содержит значение)
 consultationSchema.statics.findByTag = function findByTag(tag) {

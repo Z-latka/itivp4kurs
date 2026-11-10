@@ -14,14 +14,14 @@ import {
   Sparkles,
   UserRound,
 } from "lucide-react";
-import { errorMessage, fetchConsultations, fetchLatestReviews, saveMood } from "../api";
+import { errorMessage, fetchConsultations, fetchLatestReviews, fetchPsychologists, saveMood } from "../api";
 import { navigate } from "../router";
 import { useAuth } from "../auth/context";
 import { useToast } from "../toast/context";
-import { MoodPicker, Stars } from "../components/ui";
+import { Avatar, MoodPicker, Stars } from "../components/ui";
 import ConsultationCard from "../components/ConsultationCard";
 import Breathing from "../components/Breathing";
-import { localDateKey } from "../labels";
+import { localDateKey, plural } from "../labels";
 
 const TOPICS = [
   { tag: "тревога", label: "Тревога и паника" },
@@ -161,6 +161,7 @@ export default function Home({ page }) {
   const { user } = useAuth();
   const [featured, setFeatured] = useState([]);
   const [reviews, setReviews] = useState([]);
+  const [specialists, setSpecialists] = useState([]);
 
   useEffect(() => {
     fetchConsultations()
@@ -172,6 +173,9 @@ export default function Home({ page }) {
         setFeatured(sorted.slice(0, 3));
       })
       .catch(() => setFeatured([]));
+    fetchPsychologists()
+      .then(({ data }) => setSpecialists(data.slice(0, 4)))
+      .catch(() => setSpecialists([]));
     fetchLatestReviews(3)
       .then(({ data }) => setReviews(data))
       .catch(() => setReviews([]));
@@ -266,6 +270,35 @@ export default function Home({ page }) {
               <ConsultationCard key={c.id} item={c} />
             ))}
           </ul>
+        </section>
+      )}
+
+      {specialists.length > 0 && (
+        <section className="section">
+          <div className="section-head">
+            <div>
+              <div className="eyebrow">Специалисты</div>
+              <h2>Психологи, которым доверяют</h2>
+            </div>
+            <button className="btn btn-ghost" onClick={() => navigate("specialists")}>
+              Все специалисты <ArrowRight size={16} />
+            </button>
+          </div>
+          <div className="grid-4">
+            {specialists.map((p) => (
+              <button
+                key={p.id}
+                className="card card-hover"
+                style={{ textAlign: "left" }}
+                onClick={() => navigate(`specialists/${p.id}`)}
+              >
+                <Avatar name={p.fullName} large />
+                <h3 className="mt-sm mb-0">{p.fullName}</h3>
+                <p className="muted small mb-0">{p.title}</p>
+                {p.experienceYears ? <p className="small mt-sm mb-0">Опыт {p.experienceYears} {plural(p.experienceYears, "год", "года", "лет")} · {p.approach}</p> : null}
+              </button>
+            ))}
+          </div>
         </section>
       )}
 

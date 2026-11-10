@@ -25,9 +25,23 @@ React-клиент при замене не менялись.
 - **Дневник настроения**: оценка дня, чувства, заметка; график за 14 дней и сводка за месяц.
 - **Анонимные вопросы психологу**: переписка в формате чата с автообновлением.
 - **Самопомощь**: экстренные номера, анимированное дыхание 4-4-6, заземление 5-4-3-2-1, быстрые способы успокоиться.
-- **Личный кабинет**: обзор, записи, дневник, история тестов с динамикой, настройки профиля и пароля.
-- **Панель психолога** (роль `admin`): расписание по дням с подтверждением записей, обращения с фильтром по статусу, управление каталогом (компонент ЛР5 с optimistic updates и повтором запросов).
+- **Специалисты**: публичные анкеты психологов (опыт, метод, образование, темы, рейтинг) и их консультации.
+- **Личный кабинет клиента**: обзор, записи, дневник, история тестов с динамикой, настройки профиля и пароля.
+- **Рабочее место психолога**: своё расписание с подтверждением записей, общая очередь анонимных вопросов («взять в работу»), свои консультации (компонент ЛР5 с optimistic updates и повтором запросов), редактирование анкеты.
+- **Администрирование**: статистика сервиса, добавление и отключение психологов, весь каталог с назначением психолога, все записи.
 - Светлая и тёмная тема, адаптивная вёрстка, всплывающие уведомления о действиях.
+
+## Роли
+
+| Роль | Как появляется | Что доступно |
+|------|----------------|--------------|
+| **Клиент** (`user`) | Регистрируется сам на сайте | Запись, отзывы, тесты, дневник, анонимные вопросы, личный кабинет |
+| **Психолог** (`psychologist`) | Аккаунт создаёт администратор | Свои консультации и расписание, очередь вопросов, переписка только по взятым обращениям, своя анкета |
+| **Администратор** (`admin`) | Создаётся сидером | Психологи, весь каталог, все записи, статистика. **Переписку клиентов не видит** — она конфиденциальна |
+
+Права проверяются на сервере (middleware `requireRole`), а не только в интерфейсе:
+клиент не может создать консультацию, психолог не может изменить чужую, администратор
+не может прочитать обращение. Отключённый администратором психолог не может войти.
 
 ## Запуск (ветка 26, MongoDB)
 
@@ -68,22 +82,29 @@ URL API задаётся в `psychology-client/.env`: `VITE_API_URL=http://local
 
 | Роль | Email | Пароль |
 |------|-------|--------|
-| Психолог (admin) | `admin@mindcare.by` | `Admin123!` |
+| Администратор | `admin@mindcare.by` | `Admin123!` |
 | Клиент | `demo@mindcare.by` | `Demo123!` |
+| Психолог — Мария Соколова | `maria@mindcare.by` | `Psy123!` |
+| Психолог — Анна Ковалёва | `anna@mindcare.by` | `Psy123!` |
+| Психолог — Игорь Лебедев | `igor@mindcare.by` | `Psy123!` |
+| Психолог — Ольга Миронова | `olga@mindcare.by` | `Psy123!` |
 
-При регистрации через сайт роль всегда `user`; администраторы создаются только сидером.
+При регистрации через сайт роль всегда `user`. Психологов добавляет администратор.
 
 ## Структура (ветка 26)
 
 ```
 db.js                     подключение mongoose.connect(process.env.MONGO_URI)
 models/
-  User.js                 вложенный profile{} + массивы testResults[] и moods[]
-  Consultation.js         массив tags[] + массив отзывов reviews[] (subdocuments)
-  Booking.js              отдельная коллекция со ссылками (ref) → populate
-  Question.js             обращение с вложенной перепиской messages[]
+  User.js                 роль; вложенные profile{} и specialist{} (анкета психолога);
+                          массивы testResults[] и moods[]
+  Consultation.js         ссылка psychologist → User; массив tags[] и отзывы reviews[]
+  Booking.js              ссылки на клиента, консультацию и психолога → populate
+  Question.js             обращение: ссылка на психолога + вложенная переписка messages[]
   toJSON.js               виртуальное поле id, скрытие passwordHash
-routes/                   auth, consultations, bookings, tests, questions, moods
+middleware/auth.js        JWT и проверка ролей requireRole(...)
+routes/                   auth, consultations, bookings, tests, questions, moods,
+                          psychologists (публичные анкеты), admin
 data/tests.js             банк тестов и подсчёт баллов
 scripts/seed.js           демо-данные и создание индексов
 postman/                  коллекция Postman для проверки API
@@ -91,17 +112,18 @@ postman/                  коллекция Postman для проверки API
 
 ## REST API
 
-Базовый URL: `http://localhost:3000/api`. 🔒 — нужен заголовок `Authorization: Bearer <token>`, 👑 — только `admin`.
+Базовый URL: `http://localhost:3000/api`. 🔒 — нужен заголовок `Authorization: Bearer <token>`,
+🩺 — психолог или администратор, 👑 — только администратор.
 
 ### CRUD консультаций (методы Mongoose)
 
 | Метод | Путь | Mongoose |
 |-------|------|----------|
-| GET | `/consultations` (`?tag=`, `?search=`, `?maxPrice=`) | `Model.find(filter)` |
-| GET | `/consultations/:id` | `Model.findById(id)` |
-| POST 👑 | `/consultations` | `Model.create(body)` |
-| PUT 👑 | `/consultations/:id` | `Model.findByIdAndUpdate(id, body, { returnDocument: "after" })`¹ |
-| DELETE 👑 | `/consultations/:id` | `Model.findByIdAndDelete(id)` — возвращает удалённый документ, каскадно удаляет записи |
+| GET | `/consultations` (`?tag=`, `?search=`, `?maxPrice=`, `?psychologist=`) | `Model.find(filter).populate("psychologist")` |
+| GET | `/consultations/:id` | `Model.findById(id).populate("psychologist")` |
+| POST 🩺 | `/consultations` | `Model.create(body)` (психолог создаёт только себе) |
+| PUT 🩺 | `/consultations/:id` | `Model.findByIdAndUpdate(id, body, { returnDocument: "after" })`¹; психолог — только свои |
+| DELETE 🩺 | `/consultations/:id` | `Model.findByIdAndDelete(id)` — возвращает удалённый документ, каскадно удаляет записи |
 
 ¹ В Mongoose 9 опция `{ new: true }` объявлена устаревшей; `returnDocument: "after"` — её прямой эквивалент.
 
@@ -112,8 +134,8 @@ postman/                  коллекция Postman для проверки API
 | POST 🔒 | `/consultations/:id/reviews` | `$push` отзыва в массив `reviews` |
 | PATCH 🔒 | `/consultations/:id/reviews/:reviewId` | изменение элемента массива по месту: `$elemMatch` + позиционный `$` (`"reviews.$.rating"`) |
 | DELETE 🔒 | `/consultations/:id/reviews/:reviewId` | `$pull` из массива |
-| POST 👑 | `/consultations/:id/tags` | `$addToSet` + `$each` (без дубликатов) |
-| DELETE 👑 | `/consultations/:id/tags/:tag` | `$pull` из массива строк |
+| POST 🩺 | `/consultations/:id/tags` | `$addToSet` + `$each` (без дубликатов) |
+| DELETE 🩺 | `/consultations/:id/tags/:tag` | `$pull` из массива строк |
 | GET | `/consultations?tag=тревога` | поиск «массив содержит значение» |
 | GET | `/consultations/stats/tags` | aggregation pipeline: `$unwind → $group → $sort → $project` |
 | POST 🔒 | `/questions/:id/messages` | `$push` в `messages` + `$set` статуса одной операцией |
@@ -130,17 +152,21 @@ postman/                  коллекция Postman для проверки API
 |-------|------|----------|
 | POST | `/auth/register`, `/auth/login` | регистрация / вход, возвращают `token` и `user` |
 | GET/PUT 🔒 | `/auth/profile` | профиль |
-| POST 🔒 | `/bookings` | запись на консультацию |
-| GET 🔒 | `/bookings/my` | мои записи (`populate("consultation")`) |
+| POST 🔒 | `/bookings` | запись на консультацию (только клиент; занятое время психолога → 409) |
+| GET 🔒 | `/bookings/my` | мои записи (вложенный `populate`: консультация → психолог) |
 | PATCH 🔒 | `/bookings/:id/cancel` | отмена |
-| GET 👑 | `/bookings` | все записи (`populate` консультации и псевдонима) |
-| PATCH 👑 | `/bookings/:id/status` | смена статуса |
+| GET 🩺 | `/bookings` | расписание: психологу — свои записи, администратору — все |
+| PATCH 🩺 | `/bookings/:id/status` | смена статуса (психолог — только своих записей) |
 | GET | `/tests`, `/tests/:id` | список тестов, вопросы |
 | GET 🔒 | `/tests/results/my` | история тестов |
-| POST 🔒 | `/questions` | новое анонимное обращение |
+| POST 🔒 | `/questions` | новое анонимное обращение (только клиент) |
 | GET 🔒 | `/questions/my`, `/questions/:id` | мои обращения, переписка |
-| GET 👑 | `/questions` | все обращения |
+| GET 🩺 | `/questions?scope=queue\|mine` | очередь и обращения психолога |
+| POST 🩺 | `/questions/:id/assign` | взять обращение (атомарно: `findOneAndUpdate` с условием `psychologist: null`) |
 | PATCH 🔒 | `/questions/:id/close` | закрыть обращение |
+| GET | `/psychologists`, `/psychologists/:id` | анкеты специалистов + сводка по консультациям (`$group`) |
+| GET/POST/PATCH 👑 | `/admin/psychologists` | список, создание, правка и отключение психологов |
+| GET 👑 | `/admin/stats` | статистика: `$group` по ролям и статусам, популярные консультации через `$lookup` |
 | GET | `/consultations/:id/slots` | занятое время консультации (для выбора свободного слота) |
 | GET 🔒 | `/moods/feelings` | справочник чувств для дневника |
 | GET | `/stats`, `/health` | статистика, состояние сервера |
@@ -159,6 +185,7 @@ postman/                  коллекция Postman для проверки API
 | Профиль | колонки в `Users` | вложенный документ `profile { nickname, city, about }` |
 | Теги | отдельная таблица связи (many-to-many) | массив строк `tags[]` с индексом |
 | Записи | таблица `Bookings` с FK | отдельная коллекция со ссылками `ref` + `populate` |
+| Психолог консультации | FK `psychologistId` → `Users` + `JOIN` | ссылка `psychologist` (ObjectId) + `populate`; анкета — вложенный документ `specialist` в пользователе |
 | Схема | миграции `sequelize-cli` | схема Mongoose в коде, без миграций |
 | Каскад | `ON DELETE CASCADE` в БД | хук `post("findOneAndDelete")` в модели |
 
@@ -170,7 +197,7 @@ postman/                  коллекция Postman для проверки API
   "topic": "Тревожность и панические атаки",
   "duration": 60,
   "price": 120,
-  "specialist": "Мария Соколова, КПТ-терапевт",
+  "psychologist": "6af37f163d466a3393f06a50",
   "tags": ["тревога", "паника", "кпт"],
   "reviews": [
     {

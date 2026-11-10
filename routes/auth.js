@@ -62,6 +62,11 @@ router.post("/login", async (req, res, next) => {
     if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
       return res.status(400).json({ message: "Неверный email или пароль" });
     }
+    if (!user.active) {
+      return res
+        .status(403)
+        .json({ message: "Аккаунт отключён. Обратитесь к администратору сервиса." });
+    }
 
     res.json({
       token: signToken(user),
@@ -103,6 +108,15 @@ router.put("/profile", authenticateToken, async (req, res, next) => {
     }
     if (city !== undefined) user.profile.city = city;
     if (about !== undefined) user.profile.about = about;
+
+    // Психолог сам редактирует свою публичную анкету (кроме имени — его меняет администратор)
+    if (user.role === "psychologist" && req.body.specialist) {
+      ["title", "experienceYears", "education", "approach", "about", "topics"].forEach((field) => {
+        if (req.body.specialist[field] !== undefined) {
+          user.specialist[field] = req.body.specialist[field];
+        }
+      });
+    }
 
     if (newPassword) {
       const valid = await bcrypt.compare(currentPassword || "", user.passwordHash);

@@ -36,7 +36,7 @@ export const errorMessage = (err, fallback = "Ошибка при запросе
     ? err.response.data?.message || fallback
     : "Сервер недоступен. Проверьте подключение к интернету.";
 
-export const fetchConsultations = () => api.get("/consultations");
+export const fetchConsultations = (params) => api.get("/consultations", { params });
 
 export const fetchConsultation = (id) => api.get(`/consultations/${id}`);
 
@@ -92,7 +92,9 @@ export const createQuestion = (data) => api.post("/questions", data);
 
 export const fetchMyQuestions = () => api.get("/questions/my");
 
-export const fetchAllQuestions = () => api.get("/questions");
+export const fetchStaffQuestions = (scope) => api.get("/questions", { params: { scope } });
+
+export const assignQuestion = (id) => api.post(`/questions/${id}/assign`);
 
 export const fetchQuestion = (id) => api.get(`/questions/${id}`);
 
@@ -102,6 +104,18 @@ export const sendMessage = (id, text) =>
 export const closeQuestion = (id) => api.patch(`/questions/${id}/close`);
 
 export const fetchStats = () => api.get("/stats");
+
+export const fetchPsychologists = () => api.get("/psychologists");
+
+export const fetchPsychologist = (id) => api.get(`/psychologists/${id}`);
+
+export const adminFetchPsychologists = () => api.get("/admin/psychologists");
+
+export const adminCreatePsychologist = (data) => api.post("/admin/psychologists", data);
+
+export const adminUpdatePsychologist = (id, data) => api.patch(`/admin/psychologists/${id}`, data);
+
+export const fetchAdminStats = () => api.get("/admin/stats");
 
 export const fetchMoods = (days = 30) => api.get("/moods", { params: { days } });
 

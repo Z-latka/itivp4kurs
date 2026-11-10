@@ -6,17 +6,31 @@ import { useTheme } from "../theme";
 import { Avatar } from "./ui";
 
 export default function Header({ currentPage }) {
-  const { user, isAdmin, signOut } = useAuth();
+  const { user, isAdmin, isPsychologist, homePage, signOut } = useAuth();
   const { theme, toggle } = useTheme();
   const [open, setOpen] = useState(false);
 
-  const navLinks = [
-    { to: "consultations", label: "Консультации" },
-    { to: "tests", label: "Тесты" },
-    { to: "ask", label: "Анонимный вопрос" },
-    { to: "help", label: "Самопомощь" },
-    ...(isAdmin ? [{ to: "admin", label: "Панель психолога" }] : []),
-  ];
+  // Меню зависит от роли: сотрудникам — рабочие разделы, клиентам и гостям — сервисы
+  const navLinks = isAdmin
+    ? [
+        { to: "admin", label: "Администрирование" },
+        { to: "consultations", label: "Каталог" },
+        { to: "specialists", label: "Специалисты" },
+      ]
+    : isPsychologist
+      ? [
+          { to: "work", label: "Рабочее место" },
+          { to: "consultations", label: "Каталог" },
+          { to: "specialists", label: "Специалисты" },
+          { to: "help", label: "Самопомощь" },
+        ]
+      : [
+          { to: "consultations", label: "Консультации" },
+          { to: "specialists", label: "Специалисты" },
+          { to: "tests", label: "Тесты" },
+          { to: "ask", label: "Анонимный вопрос" },
+          { to: "help", label: "Самопомощь" },
+        ];
 
   const go = (to) => {
     setOpen(false);
@@ -87,9 +101,9 @@ export default function Header({ currentPage }) {
           {user ? (
             <>
               <button
-                className={`user-chip${currentPage === "profile" ? " active" : ""}`}
-                onClick={() => go("profile")}
-                title="Личный кабинет"
+                className={`user-chip${currentPage === homePage ? " active" : ""}`}
+                onClick={() => go(homePage)}
+                title={isAdmin ? "Администрирование" : isPsychologist ? "Рабочее место" : "Личный кабинет"}
               >
                 <Avatar name={user.nickname} />
                 <span className="ellipsis hide-mobile chip-name">{user.nickname || "Кабинет"}</span>

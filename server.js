@@ -12,6 +12,8 @@ const bookingsRouter = require("./routes/bookings");
 const testsRouter = require("./routes/tests");
 const questionsRouter = require("./routes/questions");
 const moodsRouter = require("./routes/moods");
+const psychologistsRouter = require("./routes/psychologists");
+const adminRouter = require("./routes/admin");
 
 app.use(express.json());
 app.use(cors());
@@ -26,12 +28,13 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// Общая статистика сервиса для главной страницы и панели психолога
+// Общая статистика сервиса
 app.get("/api/stats", async (req, res, next) => {
   try {
-    const [users, consultations, bookings, questions, openQuestions, tests] =
+    const [users, psychologists, consultations, bookings, questions, openQuestions, tests] =
       await Promise.all([
-        User.countDocuments(),
+        User.countDocuments({ role: "user" }),
+        User.countDocuments({ role: "psychologist", active: true }),
         Consultation.countDocuments(),
         Booking.countDocuments(),
         Question.countDocuments(),
@@ -43,6 +46,7 @@ app.get("/api/stats", async (req, res, next) => {
       ]);
     res.json({
       users,
+      psychologists,
       consultations,
       bookings,
       testsTaken: tests[0]?.total || 0,
@@ -60,6 +64,8 @@ app.use("/api/bookings", bookingsRouter);
 app.use("/api/tests", testsRouter);
 app.use("/api/questions", questionsRouter);
 app.use("/api/moods", moodsRouter);
+app.use("/api/psychologists", psychologistsRouter);
+app.use("/api/admin", adminRouter);
 
 app.use((req, res) => {
   res.status(404).json({

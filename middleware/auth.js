@@ -35,14 +35,33 @@ const optionalAuth = (req, res, next) => {
   });
 };
 
-const isAdmin = (req, res, next) => {
-  if (req.user && req.user.role === "admin") {
-    next();
-  } else {
-    return res
-      .status(403)
-      .json({ message: "Доступ разрешен только администраторам." });
-  }
+const ROLE_NAMES = {
+  user: "клиентам",
+  psychologist: "психологам",
+  admin: "администраторам",
 };
 
-module.exports = { authenticateToken, optionalAuth, isAdmin, JWT_SECRET };
+// Пропускает только пользователей с одной из перечисленных ролей
+const requireRole =
+  (...roles) =>
+  (req, res, next) => {
+    if (req.user && roles.includes(req.user.role)) return next();
+    return res.status(403).json({
+      message: `Доступ разрешен только ${roles.map((r) => ROLE_NAMES[r]).join(" и ")}.`,
+    });
+  };
+
+const isAdmin = requireRole("admin");
+const isPsychologist = requireRole("psychologist");
+// Сотрудники сервиса: психологи и администратор
+const isStaff = requireRole("psychologist", "admin");
+
+module.exports = {
+  authenticateToken,
+  optionalAuth,
+  requireRole,
+  isAdmin,
+  isPsychologist,
+  isStaff,
+  JWT_SECRET,
+};

@@ -15,7 +15,7 @@ const Link = ({ to, children }) => (
 );
 
 export default function Footer() {
-  const { user } = useAuth();
+  const { user, homePage } = useAuth();
 
   return (
     <footer className="app-footer">
@@ -39,6 +39,7 @@ export default function Footer() {
             <h4>Сервис</h4>
             <ul>
               <li><Link to="consultations">Консультации</Link></li>
+              <li><Link to="specialists">Специалисты</Link></li>
               <li><Link to="tests">Психологические тесты</Link></li>
               <li><Link to="ask">Анонимный вопрос</Link></li>
               <li><Link to="help">Самопомощь</Link></li>
@@ -47,12 +48,19 @@ export default function Footer() {
           <div>
             <h4>Аккаунт</h4>
             <ul>
-              {user ? (
+              {user?.role === "user" && (
                 <>
                   <li><Link to="profile">Личный кабинет</Link></li>
                   <li><Link to="profile?tab=mood">Дневник настроения</Link></li>
                 </>
-              ) : (
+              )}
+              {user && user.role !== "user" && (
+                <>
+                  <li><Link to={homePage}>{user.role === "admin" ? "Администрирование" : "Рабочее место"}</Link></li>
+                  <li><Link to="profile">Настройки аккаунта</Link></li>
+                </>
+              )}
+              {!user && (
                 <>
                   <li><Link to="auth">Вход</Link></li>
                   <li><Link to="auth?mode=register">Регистрация</Link></li>

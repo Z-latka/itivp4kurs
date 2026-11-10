@@ -18,7 +18,7 @@ const INITIAL_FORM = {
   duration: "",
   status: "available",
   price: "",
-  specialist: "",
+  psychologist: "",
   tags: "",
 };
 
@@ -54,7 +54,15 @@ const STATUS_COLORS = {
   busy: "#c62828",
 };
 
-export default function ConsultationsPage() {
+// psychologists — список психологов для выбора (режим администратора);
+// ownerId — показывать и создавать только консультации этого психолога
+export default function ConsultationsPage({ psychologists = null, ownerId = null }) {
+  const specialistName = (id) => {
+    const p = psychologists?.find((x) => x.id === id);
+    return p ? [p.fullName, p.title].filter(Boolean).join(", ") : "";
+  };
+  const psychologistField = (value) => (psychologists ? { psychologist: value } : {});
+
   const [consultations, setConsultations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -66,7 +74,9 @@ export default function ConsultationsPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await requestWithRetry(() => fetchConsultations());
+      const response = await requestWithRetry(() =>
+        fetchConsultations(ownerId ? { psychologist: ownerId } : undefined),
+      );
       setConsultations(response.data);
     } catch (err) {
       setError(
@@ -77,7 +87,7 @@ export default function ConsultationsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [ownerId]);
 
   useEffect(() => {
     (async () => {
@@ -107,7 +117,7 @@ export default function ConsultationsPage() {
       duration: Number(form.duration),
       status: form.status,
       price: Number(form.price) || 0,
-      specialist: form.specialist,
+      specialist: specialistName(form.psychologist),
       tags: parseTags(form.tags),
       isOptimistic: true,
     };
@@ -123,7 +133,7 @@ export default function ConsultationsPage() {
           duration: Number(form.duration),
           status: form.status,
           price: Number(form.price) || 0,
-          specialist: form.specialist,
+          ...psychologistField(form.psychologist),
           tags: parseTags(form.tags),
         }),
       );
@@ -176,7 +186,7 @@ export default function ConsultationsPage() {
       duration: String(item.duration || ""),
       status: item.status,
       price: String(item.price || ""),
-      specialist: item.specialist || "",
+      psychologist: item.psychologist?.id || "",
       tags: (item.tags || []).join(", "),
     });
   };
@@ -201,7 +211,7 @@ export default function ConsultationsPage() {
       duration: Number(form.duration),
       status: form.status,
       price: Number(form.price) || 0,
-      specialist: form.specialist,
+      specialist: psychologists ? specialistName(form.psychologist) : previous.specialist,
       tags: parseTags(form.tags),
     };
     setConsultations((prev) =>
@@ -217,7 +227,7 @@ export default function ConsultationsPage() {
           duration: Number(form.duration),
           status: form.status,
           price: Number(form.price) || 0,
-          specialist: form.specialist,
+          ...psychologistField(form.psychologist),
           tags: parseTags(form.tags),
         }),
       );
@@ -245,7 +255,7 @@ export default function ConsultationsPage() {
     <section className="page consultations">
       <div className="page-header">
         <div>
-          <h2>Каталог консультаций</h2>
+          <h2>{ownerId ? "Мои консультации" : "Каталог консультаций"}</h2>
           <p>Управление консультациями с сервером через REST API</p>
         </div>
         <button
@@ -379,15 +389,20 @@ export default function ConsultationsPage() {
                   <option value="busy">Занята</option>
                 </select>
               </div>
-              <div className="form-group">
-                <label>Специалист</label>
-                <input
-                  type="text"
-                  placeholder="ФИО и специализация"
-                  value={form.specialist}
-                  onChange={(e) => setForm({ ...form, specialist: e.target.value })}
-                />
-              </div>
+              {psychologists && (
+                <div className="form-group">
+                  <label>Психолог</label>
+                  <select
+                    value={form.psychologist}
+                    onChange={(e) => setForm({ ...form, psychologist: e.target.value })}
+                  >
+                    <option value="">— не назначен —</option>
+                    {psychologists.map((p) => (
+                      <option key={p.id} value={p.id}>{p.fullName}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="form-group">
                 <label>Теги (через запятую)</label>
                 <input
@@ -482,16 +497,22 @@ export default function ConsultationsPage() {
                                 <option value="busy">Занята</option>
                               </select>
                             </div>
-                            <div className="form-group">
-                              <label>Специалист</label>
-                              <input
-                                type="text"
-                                value={form.specialist}
-                                onChange={(e) =>
-                                  setForm({ ...form, specialist: e.target.value })
-                                }
-                              />
-                            </div>
+                            {psychologists && (
+                              <div className="form-group">
+                                <label>Психолог</label>
+                                <select
+                                  value={form.psychologist}
+                                  onChange={(e) =>
+                                    setForm({ ...form, psychologist: e.target.value })
+                                  }
+                                >
+                                  <option value="">— не назначен —</option>
+                                  {psychologists.map((p) => (
+                                    <option key={p.id} value={p.id}>{p.fullName}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
                             <div className="form-group">
                               <label>Теги (через запятую)</label>
                               <input

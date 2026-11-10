@@ -1,15 +1,40 @@
 const express = require("express");
 const router = express.Router();
 const { Booking, Consultation } = require("../models");
-const { authenticateToken, isAdmin } = require("../middleware/auth");
+const { authenticateToken, isStaff } = require("../middleware/auth");
 
 const STATUSES = ["pending", "confirmed", "completed", "cancelled"];
 
 router.use(authenticateToken);
 
-// Запись на консультацию
+// Консультация с именем психолога для ответа клиенту
+const populateConsultation = {
+  path: "consultation",
+  select: "-reviews",
+  populate: { path: "psychologist", select: Consultation.PSYCHOLOGIST_FIELDS },
+};
+
+const serialize = (booking) => {
+  const json = booking.toJSON();
+  if (booking.consultation && booking.consultation.toClient) {
+    json.consultation = booking.consultation.toClient();
+  }
+  if (booking.user && booking.user.profile) {
+    // Сотрудник видит только псевдоним клиента — анонимность сохраняется
+    json.user = { id: String(booking.user._id), nickname: booking.user.profile.nickname };
+  }
+  return json;
+};
+
+// Психолог работает только со своими записями, администратор — со всеми
+const staffFilter = (req) => (req.user.role === "admin" ? {} : { psychologist: req.user.id });
+
+// Запись на консультацию (только клиенты)
 router.post("/", async (req, res, next) => {
   try {
+    if (req.user.role !== "user") {
+      return res.status(403).json({ message: "Записываться на консультации могут только клиенты" });
+    }
     const { consultationId, scheduledAt, format, comment } = req.body;
     const consultation = await Consultation.findById(consultationId).select("-reviews");
     if (!consultation) {
@@ -31,12 +56,14 @@ router.post("/", async (req, res, next) => {
         .json({ message: "Нельзя записаться на прошедшее время" });
     }
 
-    // Время занято, если на него уже есть активная запись к этой консультации
-    // или у этого же клиента в это время другая консультация
+    // Время занято, если на него уже есть активная запись к этой консультации,
+    // к этому психологу или у этого же клиента в это время другая встреча
+    const busyFor = [{ consultation: consultation._id }, { user: req.user.id }];
+    if (consultation.psychologist) busyFor.push({ psychologist: consultation.psychologist });
     const conflict = await Booking.findOne({
       scheduledAt: date,
       status: { $ne: "cancelled" },
-      $or: [{ consultation: consultation._id }, { user: req.user.id }],
+      $or: busyFor,
     });
     if (conflict) {
       return res.status(409).json({
@@ -49,37 +76,40 @@ router.post("/", async (req, res, next) => {
     const booking = await Booking.create({
       user: req.user.id,
       consultation: consultation._id,
+      psychologist: consultation.psychologist,
       scheduledAt: date,
       format,
       comment,
     });
-    await booking.populate("consultation", "-reviews");
-    res.status(201).json(booking);
+    await booking.populate(populateConsultation);
+    res.status(201).json(serialize(booking));
   } catch (err) {
     next(err);
   }
 });
 
-// Мои записи: populate подставляет документ консультации вместо ObjectId
+// Мои записи: populate подставляет консультацию, а в ней — психолога (вложенный populate)
 router.get("/my", async (req, res, next) => {
   try {
     const bookings = await Booking.find({ user: req.user.id })
-      .populate("consultation", "-reviews")
+      .populate(populateConsultation)
       .sort({ scheduledAt: -1 });
-    res.json(bookings);
+    res.json(bookings.map(serialize));
   } catch (err) {
     next(err);
   }
 });
 
-// Отмена своей записи
+// Отмена: клиентом — своей записи, психологом — записи к нему, администратором — любой
 router.patch("/:id/cancel", async (req, res, next) => {
   try {
     const booking = await Booking.findById(req.params.id);
-    if (
-      !booking ||
-      (String(booking.user) !== req.user.id && req.user.role !== "admin")
-    ) {
+    const allowed =
+      booking &&
+      (String(booking.user) === req.user.id ||
+        req.user.role === "admin" ||
+        (req.user.role === "psychologist" && String(booking.psychologist) === req.user.id));
+    if (!allowed) {
       return res.status(404).json({ message: "Запись не найдена" });
     }
     if (booking.status === "completed") {
@@ -95,35 +125,29 @@ router.patch("/:id/cancel", async (req, res, next) => {
   }
 });
 
-// Все записи (для психолога). Из пользователя берём только псевдоним
-router.get("/", isAdmin, async (req, res, next) => {
+// Расписание сотрудника: ?status=pending
+router.get("/", isStaff, async (req, res, next) => {
   try {
-    const filter = req.query.status ? { status: req.query.status } : {};
+    const filter = staffFilter(req);
+    if (req.query.status) filter.status = req.query.status;
     const bookings = await Booking.find(filter)
-      .populate("consultation", "topic specialist price duration")
+      .populate(populateConsultation)
       .populate("user", "profile.nickname")
-      .sort({ scheduledAt: 1 })
-      .lean({ virtuals: false });
-    res.json(
-      bookings.map((b) => ({
-        ...b,
-        id: String(b._id),
-        user: b.user && { id: String(b.user._id), nickname: b.user.profile?.nickname },
-      })),
-    );
+      .sort({ scheduledAt: 1 });
+    res.json(bookings.map(serialize));
   } catch (err) {
     next(err);
   }
 });
 
-router.patch("/:id/status", isAdmin, async (req, res, next) => {
+router.patch("/:id/status", isStaff, async (req, res, next) => {
   try {
     const { status } = req.body;
     if (!STATUSES.includes(status)) {
       return res.status(400).json({ message: "Недопустимый статус" });
     }
-    const booking = await Booking.findByIdAndUpdate(
-      req.params.id,
+    const booking = await Booking.findOneAndUpdate(
+      { _id: req.params.id, ...staffFilter(req) },
       { status },
       { returnDocument: "after" },
     );

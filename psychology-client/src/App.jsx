@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Compass, UserRound } from "lucide-react";
+import { Compass, Lock, UserRound } from "lucide-react";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import { EmptyState, Loader } from "./components/ui";
@@ -11,6 +11,8 @@ import ProfilePage from "./pages/Profile";
 import AdminPage from "./pages/Admin";
 import AuthPage from "./pages/Auth";
 import HelpPage from "./pages/Help";
+import SpecialistsPage from "./pages/Specialists";
+import WorkPage from "./pages/Work";
 import { navigate, useRoute } from "./router";
 import { useAuth } from "./auth/context";
 
@@ -19,10 +21,12 @@ const PAGES = {
   faq: { component: Home, title: "Частые вопросы" },
   consultations: { component: CatalogPage, title: "Консультации" },
   tests: { component: TestsPage, title: "Психологические тесты" },
+  specialists: { component: SpecialistsPage, title: "Специалисты" },
   ask: { component: QuestionsPage, title: "Анонимный вопрос психологу" },
   help: { component: HelpPage, title: "Самопомощь" },
   profile: { component: ProfilePage, title: "Личный кабинет", private: true },
-  admin: { component: AdminPage, title: "Панель психолога", private: true },
+  work: { component: WorkPage, title: "Рабочее место психолога", private: true, role: "psychologist" },
+  admin: { component: AdminPage, title: "Администрирование", private: true, role: "admin" },
   auth: { component: AuthPage, title: "Вход" },
 };
 
@@ -40,7 +44,7 @@ function NotFound() {
 
 export default function App() {
   const route = useRoute();
-  const { user, checking } = useAuth();
+  const { user, checking, homePage } = useAuth();
   const entry = PAGES[route.page];
 
   useEffect(() => {
@@ -54,12 +58,20 @@ export default function App() {
     content = <Loader />;
   } else if (entry.private && !user) {
     content = <AuthPage query={{ next: route.page }} />;
+  } else if (entry.role && user.role !== entry.role) {
+    content = (
+      <section className="page">
+        <EmptyState icon={Lock} title="Раздел недоступен" text="Этот раздел предназначен для другой роли пользователя.">
+          <button className="btn btn-primary" onClick={() => navigate(homePage)}>Перейти в свой раздел</button>
+        </EmptyState>
+      </section>
+    );
   } else if (route.page === "auth" && user) {
     content = (
       <section className="page">
         <EmptyState icon={UserRound} title={`Вы вошли как ${user.nickname}`} text="Можно перейти в личный кабинет или продолжить с того места, где остановились.">
-          <button className="btn btn-primary" onClick={() => navigate(route.query.next || "profile")}>
-            {route.query.next ? "Продолжить" : "Личный кабинет"}
+          <button className="btn btn-primary" onClick={() => navigate(route.query.next || homePage)}>
+            {route.query.next ? "Продолжить" : "Перейти"}
           </button>
         </EmptyState>
       </section>
