@@ -27,6 +27,18 @@ const testResultSchema = new mongoose.Schema(
   { toJSON: toJSONOptions },
 );
 
+// Запись дневника настроения: одна на день, хранится внутри пользователя
+const moodSchema = new mongoose.Schema(
+  {
+    date: { type: String, required: true, match: /^\d{4}-\d{2}-\d{2}$/ }, // YYYY-MM-DD
+    mood: { type: Number, required: true, min: 1, max: 5 },
+    feelings: [String],
+    note: { type: String, trim: true, maxlength: 1000 },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { toJSON: toJSONOptions },
+);
+
 const userSchema = new mongoose.Schema(
   {
     email: {
@@ -41,6 +53,7 @@ const userSchema = new mongoose.Schema(
     role: { type: String, enum: ["user", "admin"], default: "user" },
     profile: { type: profileSchema, default: () => ({}) },
     testResults: [testResultSchema],
+    moods: [moodSchema],
   },
   { timestamps: true, toJSON: toJSONOptions },
 );

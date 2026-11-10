@@ -4,7 +4,26 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="MindCare — анонимная психологическая поддержка онлайн: консультации с психологами, тесты, дневник настроения и упражнения самопомощи."
+    />
+    <meta name="theme-color" content="#2f6b5e" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
     <title>MindCare — психологическая поддержка</title>
+    <script>
+      // Тема применяется до отрисовки, чтобы не было вспышки светлой темы
+      try {
+        var saved = localStorage.getItem("theme");
+        var dark = saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+        if (dark) document.documentElement.setAttribute("data-theme", "dark");
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

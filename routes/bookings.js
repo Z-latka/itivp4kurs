@@ -31,6 +31,21 @@ router.post("/", async (req, res, next) => {
         .json({ message: "Нельзя записаться на прошедшее время" });
     }
 
+    // Время занято, если на него уже есть активная запись к этой консультации
+    // или у этого же клиента в это время другая консультация
+    const conflict = await Booking.findOne({
+      scheduledAt: date,
+      status: { $ne: "cancelled" },
+      $or: [{ consultation: consultation._id }, { user: req.user.id }],
+    });
+    if (conflict) {
+      return res.status(409).json({
+        message: String(conflict.user) === req.user.id
+          ? "У вас уже есть запись на это время"
+          : "Это время уже занято, выберите другое",
+      });
+    }
+
     const booking = await Booking.create({
       user: req.user.id,
       consultation: consultation._id,

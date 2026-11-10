@@ -51,6 +51,15 @@ export const deleteConsultation = (id) => api.delete(`/consultations/${id}`);
 export const addReview = (id, review) =>
   api.post(`/consultations/${id}/reviews`, review);
 
+export const updateReview = (id, reviewId, review) =>
+  api.patch(`/consultations/${id}/reviews/${reviewId}`, review);
+
+export const fetchLatestReviews = (limit = 3) =>
+  api.get("/consultations/reviews/latest", { params: { limit } });
+
+export const fetchSlots = (id, from, to) =>
+  api.get(`/consultations/${id}/slots`, { params: { from, to } });
+
 export const login = (credentials) => api.post("/auth/login", credentials);
 
 export const register = (userData) => api.post("/auth/register", userData);
@@ -93,5 +102,13 @@ export const sendMessage = (id, text) =>
 export const closeQuestion = (id) => api.patch(`/questions/${id}/close`);
 
 export const fetchStats = () => api.get("/stats");
+
+export const fetchMoods = (days = 30) => api.get("/moods", { params: { days } });
+
+export const fetchFeelings = () => api.get("/moods/feelings");
+
+export const saveMood = (entry) => api.post("/moods", entry);
+
+export const deleteMood = (id) => api.delete(`/moods/${id}`);
 
 export default api;

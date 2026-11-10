@@ -6,6 +6,10 @@ const mongoose = require("mongoose");
 const connectDB = require("../db");
 const { User, Consultation, Booking, Question } = require("../models");
 
+// Дата в формате ГГГГ-ММ-ДД по местному времени (toISOString дал бы UTC)
+const localDate = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
 const ACCOUNTS = [
   {
     email: "admin@mindcare.by",
@@ -103,27 +107,57 @@ const run = async () => {
   const demo = users.user;
 
   if ((await Consultation.countDocuments()) === 0) {
+    // Демо-отзывы других клиентов (у них нет аккаунтов — только id автора и псевдоним)
+    const review = (nickname, rating, comment, daysAgo) => ({
+      user: new mongoose.Types.ObjectId(),
+      nickname,
+      rating,
+      comment,
+      createdAt: new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000),
+    });
+    const REVIEWS = [
+      [
+        review("Северный Ветер", 5, "После трёх встреч панические атаки стали реже. Очень помогли простые техники, которые можно делать в метро.", 12),
+        review("Мята", 4, "Спокойно, без давления. Было страшно начинать, но психолог сразу объяснил, как будет проходить работа.", 5),
+      ],
+      [
+        review("Уставший Кот", 5, "Наконец поняла, почему выгораю, и научилась говорить «нет» на работе без чувства вины.", 9),
+      ],
+      [
+        review("Тихая Гавань", 4, "Бережный специалист. Важно, что можно было общаться в чате, когда говорить вслух было тяжело.", 20),
+      ],
+      [],
+      [
+        review("Лесной", 5, "Бесплатная встреча помогла понять, к кому идти дальше. Хорошая точка входа.", 3),
+      ],
+      [],
+    ];
+
     const created = await Consultation.insertMany(
-      CATALOG.map((c, i) => ({
-        ...c,
-        reviews:
-          i < 3
-            ? [
-                {
-                  user: demo._id,
-                  nickname: demo.profile.nickname,
-                  rating: 5 - i,
-                  comment: "Спокойная атмосфера, получил(а) конкретные упражнения.",
-                },
-              ]
-            : [],
-      })),
+      CATALOG.map((c, i) => ({ ...c, reviews: REVIEWS[i] || [] })),
+    );
+    // Отзыв демо-клиента — его можно отредактировать на сайте
+    await Consultation.updateOne(
+      { _id: created[0]._id },
+      {
+        $push: {
+          reviews: {
+            user: demo._id,
+            nickname: demo.profile.nickname,
+            rating: 5,
+            comment: "Получил(а) конкретные упражнения и чувство, что со мной всё в порядке.",
+          },
+        },
+      },
     );
 
+    // Через 3 дня, ровно в 14:00 — время записи выбирается по часовым слотам
+    const bookingDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    bookingDate.setHours(14, 0, 0, 0);
     await Booking.create({
       user: demo._id,
       consultation: created[0]._id,
-      scheduledAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+      scheduledAt: bookingDate,
       format: "video",
       comment: "Хочу научиться справляться с тревогой перед экзаменами",
     });
@@ -153,6 +187,15 @@ const run = async () => {
             level: "mild",
             levelTitle: "Лёгкая тревожность",
             answers: [1, 2, 1, 1, 2, 1, 1],
+          },
+          // Дневник настроения за последнюю неделю
+          moods: {
+            $each: [3, 2, 2, 3, 4, 3, 4].map((mood, i) => ({
+              date: localDate(new Date(Date.now() - (6 - i) * 24 * 60 * 60 * 1000)),
+              mood,
+              feelings: mood <= 2 ? ["тревога", "усталость"] : ["спокойствие"],
+              note: mood <= 2 ? "Много учёбы, плохо спал(а)" : "",
+            })),
           },
         },
       },

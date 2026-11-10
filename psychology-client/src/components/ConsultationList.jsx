@@ -5,6 +5,12 @@ import {
   updateConsultation,
   deleteConsultation,
 } from "../api";
+import { CircleAlert, CircleCheck, Clock, Inbox, Plus, Wallet, X } from "lucide-react";
+import { formatPrice } from "../labels";
+
+// Теги вводятся через запятую: "тревога, стресс" → ["тревога", "стресс"]
+const parseTags = (value) =>
+  [...new Set(value.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean))];
 
 const INITIAL_FORM = {
   topic: "",
@@ -13,6 +19,7 @@ const INITIAL_FORM = {
   status: "available",
   price: "",
   specialist: "",
+  tags: "",
 };
 
 const DELAY = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -101,6 +108,7 @@ export default function ConsultationsPage() {
       status: form.status,
       price: Number(form.price) || 0,
       specialist: form.specialist,
+      tags: parseTags(form.tags),
       isOptimistic: true,
     };
 
@@ -116,6 +124,7 @@ export default function ConsultationsPage() {
           status: form.status,
           price: Number(form.price) || 0,
           specialist: form.specialist,
+          tags: parseTags(form.tags),
         }),
       );
       setConsultations((prev) =>
@@ -168,6 +177,7 @@ export default function ConsultationsPage() {
       status: item.status,
       price: String(item.price || ""),
       specialist: item.specialist || "",
+      tags: (item.tags || []).join(", "),
     });
   };
 
@@ -192,6 +202,7 @@ export default function ConsultationsPage() {
       status: form.status,
       price: Number(form.price) || 0,
       specialist: form.specialist,
+      tags: parseTags(form.tags),
     };
     setConsultations((prev) =>
       prev.map((c) => (c.id === editingId ? optimisticUpdated : c)),
@@ -207,6 +218,7 @@ export default function ConsultationsPage() {
           status: form.status,
           price: Number(form.price) || 0,
           specialist: form.specialist,
+          tags: parseTags(form.tags),
         }),
       );
       setConsultations((prev) =>
@@ -243,7 +255,7 @@ export default function ConsultationsPage() {
             if (el) el.scrollIntoView({ behavior: "smooth" });
           }}
         >
-          ➕ Новая консультация
+          <Plus size={16} /> Новая консультация
         </button>
       </div>
 
@@ -256,7 +268,7 @@ export default function ConsultationsPage() {
 
       {error && !loading && (
         <div className="alert alert-error">
-          <span>⚠</span>
+          <CircleAlert size={18} />
           <span>{error}</span>
           <button
             className="btn btn-sm btn-outline"
@@ -272,20 +284,15 @@ export default function ConsultationsPage() {
         <>
           {notify && (
             <div className={`alert alert-${notify.type}`}>
-              <span>{notify.type === "error" ? "⚠" : "✓"}</span>
+              {notify.type === "error" ? <CircleAlert size={18} /> : <CircleCheck size={18} />}
               <span>{notify.message}</span>
               <button
-                className="btn btn-sm"
+                className="icon-btn"
                 onClick={clearNotify}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "inherit",
-                  fontSize: "1.25rem",
-                  padding: 0,
-                }}
+                aria-label="Закрыть"
+                style={{ marginLeft: "auto", width: 28, height: 28, color: "inherit" }}
               >
-                ×
+                <X size={16} />
               </button>
             </div>
           )}
@@ -382,6 +389,15 @@ export default function ConsultationsPage() {
                 />
               </div>
               <div className="form-group">
+                <label>Теги (через запятую)</label>
+                <input
+                  type="text"
+                  placeholder="тревога, стресс"
+                  value={form.tags}
+                  onChange={(e) => setForm({ ...form, tags: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
                 <label>Цена (руб.)</label>
                 <input
                   type="number"
@@ -401,7 +417,7 @@ export default function ConsultationsPage() {
           <div className="consultations-list">
             {consultations.length === 0 ? (
               <div className="empty-state">
-                <div className="empty-icon">📭</div>
+                <div className="empty-icon"><Inbox size={28} /></div>
                 <h3>Консультаций пока нет</h3>
                 <p>Добавьте первую консультацию, используя форму выше.</p>
               </div>
@@ -477,6 +493,16 @@ export default function ConsultationsPage() {
                               />
                             </div>
                             <div className="form-group">
+                              <label>Теги (через запятую)</label>
+                              <input
+                                type="text"
+                                value={form.tags}
+                                onChange={(e) =>
+                                  setForm({ ...form, tags: e.target.value })
+                                }
+                              />
+                            </div>
+                            <div className="form-group">
                               <label>Цена (руб.)</label>
                               <input
                                 type="number"
@@ -534,17 +560,24 @@ export default function ConsultationsPage() {
                           <h3 className="card-title">{item.topic}</h3>
                         </div>
                         <div className="card-meta">
-                          <span>💰 {item.price || 0} руб.</span>
-                          <span>⏱ {item.duration} мин</span>
+                          <span className="row" style={{ gap: "0.25rem" }}><Wallet size={13} /> {formatPrice(item.price)}</span>
+                          <span className="row" style={{ gap: "0.25rem" }}><Clock size={13} /> {item.duration} мин</span>
                         </div>
                       </div>
                       <div className="card-body">
                         {item.specialist && (
-                          <p className="specialist">👩‍⚕️ {item.specialist}</p>
+                          <p className="specialist">{item.specialist}</p>
                         )}
                         <p className="card-description">
                           {item.description || "Описание не указано"}
                         </p>
+                        {item.tags?.length > 0 && (
+                          <div className="chips">
+                            {item.tags.map((t) => (
+                              <span key={t} className="chip chip-accent">#{t}</span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       <div className="card-footer">
                         <button

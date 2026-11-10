@@ -1,18 +1,29 @@
+import { LifeBuoy } from "lucide-react";
+import { navigate } from "../router";
+
 export default function CrisisNote({ strong = false }) {
   return (
-    <div className={`crisis-note${strong ? " crisis-note-strong" : ""}`}>
-      <div className="crisis-icon">🆘</div>
+    <div className={`crisis-note${strong ? " strong" : ""}`} role={strong ? "alert" : undefined}>
+      <LifeBuoy size={22} />
       <div>
         <strong>
           {strong
-            ? "Если у вас появляются мысли причинить себе вред — вы не одни."
+            ? "Если появляются мысли причинить себе вред — вы не одни, и помощь есть."
             : "Нужна срочная помощь?"}
         </strong>
         <p>
-          Позвоните на единый номер экстренных служб <a href="tel:112">112</a>{" "}
-          или в скорую помощь <a href="tel:103">103</a>. Вы также можете
-          обратиться на телефон доверия вашего города — там круглосуточно и
-          анонимно выслушают и помогут.
+          Позвоните <a href="tel:112" className="phone-link">112</a> или{" "}
+          <a href="tel:103" className="phone-link">103</a>, либо на телефон
+          доверия вашего города — там круглосуточно и анонимно выслушают.{" "}
+          <a
+            href="#/help"
+            onClick={(e) => {
+              e.preventDefault();
+              navigate("help");
+            }}
+          >
+            Что можно сделать прямо сейчас →
+          </a>
         </p>
       </div>
     </div>

@@ -1,4 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  Clock,
+  Inbox,
+  Lock,
+  MessageCircle,
+  Send,
+  Stethoscope,
+  UserRound,
+} from "lucide-react";
 import {
   closeQuestion,
   createQuestion,
@@ -9,44 +19,86 @@ import {
 } from "../api";
 import { navigate } from "../router";
 import { useAuth } from "../auth/context";
-import Badge from "../components/Badge";
+import { useToast } from "../toast/context";
+import ConfirmDialog from "../components/ConfirmDialog";
+import { Badge, EmptyState, Loader, PageHeader } from "../components/ui";
 import { QUESTION_STATUS, formatDate } from "../labels";
 
 const qid = (q) => q.id || q._id;
+const POLL_MS = 15000;
 
 function Intro() {
   return (
     <section className="page">
-      <div className="page-header">
-        <div>
-          <h2>Анонимный вопрос психологу</h2>
-          <p>Опишите, что вас беспокоит, — специалист ответит в личной переписке</p>
-        </div>
-      </div>
-      <div className="features-grid">
-        <div className="feature-card">
-          <div className="feature-icon">🎭</div>
+      <PageHeader
+        eyebrow="Анонимный вопрос"
+        title="Спросите психолога — без имени"
+        subtitle="Опишите, что вас беспокоит. Психолог ответит в личной переписке, а вы сможете продолжить диалог."
+      />
+      <div className="grid-3">
+        <div className="card card-soft feature">
+          <div className="icon-tile"><UserRound size={22} /></div>
           <h3>Под псевдонимом</h3>
           <p>Психолог не видит ваш email — только выбранный псевдоним.</p>
         </div>
-        <div className="feature-card">
-          <div className="feature-icon">⏳</div>
+        <div className="card card-soft feature">
+          <div className="icon-tile"><Clock size={22} /></div>
           <h3>Ответ в течение суток</h3>
-          <p>Вы получите ответ в этом разделе и сможете продолжить диалог.</p>
+          <p>Ответ появится в этом разделе, можно задавать уточняющие вопросы.</p>
+        </div>
+        <div className="card card-soft feature">
+          <div className="icon-tile"><Lock size={22} /></div>
+          <h3>Только для вас</h3>
+          <p>Переписку видите только вы и психолог сервиса.</p>
         </div>
       </div>
       <div className="cta-card mt">
         <h2>Войдите, чтобы задать вопрос</h2>
-        <p>Аккаунт нужен, чтобы только вы видели ответ специалиста.</p>
-        <button className="btn btn-primary" onClick={() => navigate("auth?next=ask")}>
-          Войти или зарегистрироваться
+        <p>Аккаунт нужен, чтобы ответ специалиста видели только вы. Регистрация занимает минуту.</p>
+        <button className="btn btn-lg" onClick={() => navigate("auth?mode=register&next=ask")}>
+          Создать анонимный аккаунт
         </button>
       </div>
     </section>
   );
 }
 
+export function QuestionRow({ question, showAuthor = false }) {
+  const status = QUESTION_STATUS[question.status] || QUESTION_STATUS.open;
+  const last = question.messages?.at(-1);
+  const author = question.user?.nickname || question.nickname;
+  const open = () => navigate(`ask/${qid(question)}`);
+  return (
+    <li
+      className="card card-hover list-row clickable"
+      onClick={open}
+      onKeyDown={(e) => e.key === "Enter" && open()}
+      tabIndex={0}
+      role="link"
+    >
+      <div className="icon-tile sm"><MessageCircle size={18} /></div>
+      <div className="list-row-main">
+        <strong className="ellipsis">{question.topic}</strong>
+        {last && (
+          <span className="muted small ellipsis">
+            {last.authorRole === "psychologist" ? "Психолог: " : ""}
+            {last.text}
+          </span>
+        )}
+        <span className="muted xsmall">
+          {showAuthor && author ? `${author} · ` : ""}
+          {formatDate(question.updatedAt)} · сообщений: {question.messages?.length || 0}
+        </span>
+      </div>
+      <div className="list-row-side">
+        <Badge color={status.color}>{status.label}</Badge>
+      </div>
+    </li>
+  );
+}
+
 function QuestionsList() {
+  const toast = useToast();
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -63,204 +115,237 @@ function QuestionsList() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSending(true);
-    setError(null);
     try {
       const { data } = await createQuestion(form);
+      toast("Вопрос отправлен психологу");
       navigate(`ask/${qid(data)}`);
     } catch (err) {
-      setError(errorMessage(err, "Не удалось отправить вопрос"));
+      toast(errorMessage(err, "Не удалось отправить вопрос"), "error");
       setSending(false);
     }
   };
 
   return (
     <section className="page">
-      <div className="page-header">
+      <PageHeader
+        eyebrow="Анонимный вопрос"
+        title="Вопрос психологу"
+        subtitle="Специалист видит только ваш псевдоним. Обычно отвечаем в течение суток."
+      />
+      {error && <div className="alert alert-error">{error}</div>}
+
+      <div className="detail-grid">
+        <form className="card" onSubmit={handleSubmit}>
+          <h3>Новое обращение</h3>
+          <div className="form-group mt-sm">
+            <label htmlFor="q-topic">Тема</label>
+            <input
+              id="q-topic"
+              value={form.topic}
+              maxLength={120}
+              onChange={(e) => setForm({ ...form, topic: e.target.value })}
+              placeholder="Например: постоянная тревога перед работой"
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="q-text">Опишите ситуацию</label>
+            <textarea
+              id="q-text"
+              rows={7}
+              maxLength={5000}
+              value={form.text}
+              onChange={(e) => setForm({ ...form, text: e.target.value })}
+              placeholder="Что происходит, как давно, что уже пробовали. Чем подробнее — тем точнее ответ."
+              required
+            />
+            <div className="hint">{form.text.length} / 5000</div>
+          </div>
+          <button className="btn btn-primary" disabled={sending}>
+            <Send size={16} /> {sending ? "Отправляем…" : "Отправить анонимно"}
+          </button>
+        </form>
+
         <div>
-          <h2>Анонимный вопрос психологу</h2>
-          <p>Специалист видит только ваш псевдоним. Ответ появится здесь же.</p>
+          <h3>Мои обращения</h3>
+          {loading && <Loader />}
+          {!loading && questions.length === 0 && (
+            <div className="card card-soft">
+              <EmptyState icon={Inbox} title="Пока пусто" text="Здесь появятся ваши вопросы и ответы психолога." />
+            </div>
+          )}
+          <ul className="list">
+            {questions.map((q) => (
+              <QuestionRow key={qid(q)} question={q} />
+            ))}
+          </ul>
         </div>
       </div>
-
-      {error && <div className="alert alert-error">⚠ {error}</div>}
-
-      <form className="card" onSubmit={handleSubmit}>
-        <h3>Новое обращение</h3>
-        <div className="form-group">
-          <label>Тема</label>
-          <input
-            value={form.topic}
-            maxLength={120}
-            onChange={(e) => setForm({ ...form, topic: e.target.value })}
-            placeholder="Например: постоянная тревога перед работой"
-            required
-          />
-        </div>
-        <div className="form-group">
-          <label>Опишите ситуацию</label>
-          <textarea
-            rows={5}
-            value={form.text}
-            onChange={(e) => setForm({ ...form, text: e.target.value })}
-            placeholder="Расскажите, что происходит, как давно и что уже пробовали"
-            required
-          />
-        </div>
-        <button className="btn btn-primary" disabled={sending}>
-          {sending ? "Отправка…" : "Отправить анонимно"}
-        </button>
-      </form>
-
-      <h3 className="mt">Мои обращения</h3>
-      {loading && <div className="loading-state"><div className="spinner"></div></div>}
-      {!loading && questions.length === 0 && (
-        <p className="muted">Вы ещё не задавали вопросов.</p>
-      )}
-      <ul className="list">
-        {questions.map((q) => (
-          <QuestionRow key={qid(q)} question={q} />
-        ))}
-      </ul>
     </section>
-  );
-}
-
-export function QuestionRow({ question, showAuthor = false }) {
-  const status = QUESTION_STATUS[question.status] || QUESTION_STATUS.open;
-  const last = question.messages?.at(-1);
-  const author = question.user?.nickname || question.nickname;
-  return (
-    <li className="card list-row clickable" onClick={() => navigate(`ask/${qid(question)}`)}>
-      <div className="list-row-main">
-        <strong>{question.topic}</strong>
-        <span className="muted small">
-          {showAuthor && author ? `${author} · ` : ""}
-          {formatDate(question.updatedAt)} · сообщений: {question.messages?.length || 0}
-        </span>
-        {last && <span className="muted small ellipsis">{last.text}</span>}
-      </div>
-      <Badge color={status.color}>{status.label}</Badge>
-    </li>
   );
 }
 
 function Thread({ id }) {
   const { user, isAdmin } = useAuth();
+  const toast = useToast();
   const [question, setQuestion] = useState(null);
   const [error, setError] = useState(null);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [confirmClose, setConfirmClose] = useState(false);
   const endRef = useRef(null);
+  const count = question?.messages.length;
+
+  const load = useCallback(
+    () =>
+      fetchQuestion(id)
+        .then(({ data }) => setQuestion(data))
+        .catch((err) => setError(errorMessage(err, "Обращение не найдено"))),
+    [id],
+  );
 
   useEffect(() => {
-    fetchQuestion(id)
-      .then(({ data }) => setQuestion(data))
-      .catch((err) => setError(errorMessage(err, "Обращение не найдено")));
-  }, [id]);
+    load();
+    // Подгружаем новые сообщения, пока страница открыта
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") load();
+    }, POLL_MS);
+    return () => clearInterval(timer);
+  }, [load]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "nearest" });
-  }, [question]);
+  }, [count]);
 
   if (error && !question) {
     return (
       <section className="page">
-        <div className="alert alert-error">⚠ {error}</div>
-        <button className="btn btn-outline" onClick={() => navigate("ask")}>← К обращениям</button>
+        <a href="#/ask" className="back-link"><ArrowLeft size={16} /> К обращениям</a>
+        <div className="alert alert-error">{error}</div>
       </section>
     );
   }
-  if (!question) return <div className="loading-state"><div className="spinner"></div></div>;
+  if (!question) return <Loader />;
 
-  const isOwner = question.userId === user.id || question.user === user.id;
+  const isOwner = String(question.userId) === String(user.id);
   const asPsychologist = isAdmin && !isOwner;
   const status = QUESTION_STATUS[question.status] || QUESTION_STATUS.open;
 
   const handleSend = async (e) => {
-    e.preventDefault();
+    e?.preventDefault();
+    if (!text.trim()) return;
     setSending(true);
-    setError(null);
     try {
       await sendMessage(id, text);
-      const { data } = await fetchQuestion(id);
-      setQuestion(data);
       setText("");
+      await load();
     } catch (err) {
-      setError(errorMessage(err, "Не удалось отправить сообщение"));
+      toast(errorMessage(err, "Не удалось отправить сообщение"), "error");
     } finally {
       setSending(false);
     }
   };
 
   const handleClose = async () => {
+    setConfirmClose(false);
     try {
       await closeQuestion(id);
       setQuestion({ ...question, status: "closed" });
+      toast("Обращение закрыто");
     } catch (err) {
-      setError(errorMessage(err));
+      toast(errorMessage(err), "error");
     }
   };
 
+  const backTo = asPsychologist ? "admin?tab=questions" : "ask";
+
   return (
     <section className="page">
-      <button
-        className="btn btn-outline btn-sm"
-        onClick={() => navigate(asPsychologist ? "admin?tab=questions" : "ask")}
+      <a
+        href={`#/${backTo}`}
+        className="back-link"
+        onClick={(e) => {
+          e.preventDefault();
+          navigate(backTo);
+        }}
       >
-        ← {asPsychologist ? "Все обращения" : "Мои обращения"}
-      </button>
-      <div className="card mt">
+        <ArrowLeft size={16} /> {asPsychologist ? "Все обращения" : "Мои обращения"}
+      </a>
+      <div className="card thread">
         <div className="thread-head">
-          <div>
-            <h2>{question.topic}</h2>
+          <div style={{ minWidth: 0 }}>
+            <h2 style={{ fontSize: "1.45rem" }}>{question.topic}</h2>
             <span className="muted small">
-              {asPsychologist && `Клиент: ${question.user?.nickname || question.nickname || "Аноним"} · `}
+              {asPsychologist && `Клиент: ${question.user?.nickname || "Аноним"} · `}
               Создано {formatDate(question.createdAt)}
             </span>
           </div>
           <Badge color={status.color}>{status.label}</Badge>
         </div>
 
-        <div className="messages">
+        <div className="messages" aria-live="polite">
           {question.messages.map((m, i) => {
-            const mine = asPsychologist ? m.authorRole === "psychologist" : m.authorRole === "user";
+            const fromPsychologist = m.authorRole === "psychologist";
+            const mine = asPsychologist ? fromPsychologist : !fromPsychologist;
             return (
               <div key={m.id || m._id || i} className={`message${mine ? " mine" : ""}`}>
                 <div className="message-author">
-                  {m.authorRole === "psychologist" ? "👩‍⚕️ Психолог" : asPsychologist ? "🎭 Клиент" : "Вы"}
+                  {fromPsychologist ? <Stethoscope size={13} /> : <UserRound size={13} />}
+                  {fromPsychologist ? "Психолог" : asPsychologist ? question.user?.nickname || "Клиент" : "Вы"}
                 </div>
                 <div className="message-text">{m.text}</div>
                 <div className="message-time">{formatDate(m.createdAt)}</div>
               </div>
             );
           })}
+          {!asPsychologist && question.status === "open" && (
+            <p className="muted small center">Психолог ответит в течение суток. Страница обновляется сама.</p>
+          )}
           <div ref={endRef} />
         </div>
 
-        {error && <div className="alert alert-error">⚠ {error}</div>}
-
         {question.status === "closed" ? (
-          <p className="muted">Обращение закрыто. Если появятся новые вопросы — создайте новое.</p>
+          <div className="composer">
+            <p className="muted mb-0">
+              Обращение закрыто. Если появятся новые вопросы —{" "}
+              <a href="#/ask">создайте новое</a>.
+            </p>
+          </div>
         ) : (
-          <form className="reply-form" onSubmit={handleSend}>
+          <form className="composer" onSubmit={handleSend}>
             <textarea
               rows={3}
               value={text}
+              maxLength={5000}
               onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleSend();
+              }}
               placeholder={asPsychologist ? "Ответ клиенту…" : "Ваше сообщение…"}
-              required
+              aria-label="Сообщение"
             />
-            <div className="form-actions">
-              <button className="btn btn-primary" disabled={sending}>
-                {sending ? "Отправка…" : "Отправить"}
-              </button>
-              <button type="button" className="btn btn-outline" onClick={handleClose}>
+            <div className="row-between">
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConfirmClose(true)}>
                 Закрыть обращение
               </button>
+              <div className="row">
+                <span className="muted xsmall hide-mobile">Ctrl + Enter</span>
+                <button className="btn btn-primary" disabled={sending || !text.trim()}>
+                  <Send size={16} /> Отправить
+                </button>
+              </div>
             </div>
           </form>
         )}
       </div>
+      <ConfirmDialog
+        open={confirmClose}
+        title="Закрыть обращение?"
+        text="Переписка сохранится, но новые сообщения отправить будет нельзя."
+        confirmLabel="Закрыть"
+        onConfirm={handleClose}
+        onCancel={() => setConfirmClose(false)}
+      />
     </section>
   );
 }

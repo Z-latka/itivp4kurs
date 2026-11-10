@@ -11,6 +11,7 @@ const authRouter = require("./routes/auth");
 const bookingsRouter = require("./routes/bookings");
 const testsRouter = require("./routes/tests");
 const questionsRouter = require("./routes/questions");
+const moodsRouter = require("./routes/moods");
 
 app.use(express.json());
 app.use(cors());
@@ -58,6 +59,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/bookings", bookingsRouter);
 app.use("/api/tests", testsRouter);
 app.use("/api/questions", questionsRouter);
+app.use("/api/moods", moodsRouter);
 
 app.use((req, res) => {
   res.status(404).json({

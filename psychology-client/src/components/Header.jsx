@@ -1,16 +1,20 @@
 import { useState } from "react";
+import { Leaf, LifeBuoy, LogOut, Menu, Moon, Sun, X } from "lucide-react";
 import { navigate } from "../router";
 import { useAuth } from "../auth/context";
+import { useTheme } from "../theme";
+import { Avatar } from "./ui";
 
 export default function Header({ currentPage }) {
   const { user, isAdmin, signOut } = useAuth();
+  const { theme, toggle } = useTheme();
   const [open, setOpen] = useState(false);
 
   const navLinks = [
-    { to: "home", label: "Главная" },
     { to: "consultations", label: "Консультации" },
     { to: "tests", label: "Тесты" },
     { to: "ask", label: "Анонимный вопрос" },
+    { to: "help", label: "Самопомощь" },
     ...(isAdmin ? [{ to: "admin", label: "Панель психолога" }] : []),
   ];
 
@@ -20,21 +24,25 @@ export default function Header({ currentPage }) {
   };
 
   return (
-    <nav className="header scrolled">
+    <header className="header">
       <div className="header-container">
-        <div className="logo" onClick={() => go("home")} style={{ cursor: "pointer" }}>
-          <span className="logo-icon">🌿</span>
-          <span className="logo-text">Mind<span className="logo-accent">Care</span></span>
-        </div>
-        <button
-          className="burger"
-          aria-label="Меню"
-          aria-expanded={open}
-          onClick={() => setOpen(!open)}
+        <a
+          className="logo"
+          href="#/"
+          onClick={(e) => {
+            e.preventDefault();
+            go("home");
+          }}
         >
-          {open ? "✕" : "☰"}
-        </button>
-        <div className={`nav-links${open ? " open" : ""}`}>
+          <span className="logo-mark">
+            <Leaf size={20} />
+          </span>
+          <span>
+            Mind<span className="logo-accent">Care</span>
+          </span>
+        </a>
+
+        <nav className={`nav-links${open ? " open" : ""}`} aria-label="Основное меню">
           {navLinks.map((link) => (
             <a
               key={link.to}
@@ -44,40 +52,77 @@ export default function Header({ currentPage }) {
                 go(link.to);
               }}
               className={`nav-link${currentPage === link.to ? " active" : ""}`}
+              aria-current={currentPage === link.to ? "page" : undefined}
             >
               {link.label}
             </a>
           ))}
-          <div className="nav-actions">
-            {user ? (
-              <>
-                <button
-                  className={`btn btn-outline btn-sm${currentPage === "profile" ? " active" : ""}`}
-                  onClick={() => go("profile")}
-                  title={user.email}
-                >
-                  👤 {user.nickname || "Кабинет"}
-                </button>
-                <button
-                  className="btn btn-sm btn-ghost"
-                  onClick={() => {
-                    signOut();
-                    go("home");
-                  }}
-                >
-                  Выйти
-                </button>
-              </>
-            ) : (
-              currentPage !== "auth" && (
-                <button className="btn btn-primary btn-sm" onClick={() => go("auth")}>
-                  Войти
-                </button>
-              )
-            )}
-          </div>
+          {user && (
+            <button className="btn btn-ghost mobile-only" onClick={() => { signOut(); go("home"); }}>
+              <LogOut size={16} /> Выйти
+            </button>
+          )}
+        </nav>
+
+        <div className="nav-actions">
+          <a
+            href="#/help"
+            className="sos-link hide-mobile"
+            title="Помощь сейчас"
+            onClick={(e) => {
+              e.preventDefault();
+              go("help");
+            }}
+          >
+            <LifeBuoy size={16} /> <span className="sos-text">Помощь сейчас</span>
+          </a>
+          <button
+            className="icon-btn"
+            onClick={toggle}
+            aria-label={theme === "dark" ? "Светлая тема" : "Тёмная тема"}
+            title={theme === "dark" ? "Светлая тема" : "Тёмная тема"}
+          >
+            {theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}
+          </button>
+          {user ? (
+            <>
+              <button
+                className={`user-chip${currentPage === "profile" ? " active" : ""}`}
+                onClick={() => go("profile")}
+                title="Личный кабинет"
+              >
+                <Avatar name={user.nickname} />
+                <span className="ellipsis hide-mobile chip-name">{user.nickname || "Кабинет"}</span>
+              </button>
+              <button
+                className="icon-btn hide-mobile"
+                onClick={() => {
+                  signOut();
+                  go("home");
+                }}
+                aria-label="Выйти"
+                title="Выйти"
+              >
+                <LogOut size={18} />
+              </button>
+            </>
+          ) : (
+            currentPage !== "auth" && (
+              <button className="btn btn-primary btn-sm" onClick={() => go("auth")}>
+                Войти
+              </button>
+            )
+          )}
+          <button
+            className="icon-btn burger"
+            aria-label="Меню"
+            aria-expanded={open}
+            onClick={() => setOpen(!open)}
+          >
+            {open ? <X size={22} /> : <Menu size={22} />}
+          </button>
         </div>
       </div>
-    </nav>
+    </header>
   );
 }

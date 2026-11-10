@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { Consultation, User } = require("../models");
+const { Consultation, User, Booking } = require("../models");
 const { authenticateToken, isAdmin } = require("../middleware/auth");
 
 const FIELDS = ["topic", "description", "duration", "status", "price", "specialist", "tags"];
@@ -76,6 +76,53 @@ router.get("/stats/tags", async (req, res, next) => {
   }
 });
 
+// Последние отзывы по всем консультациям (для главной страницы)
+router.get("/reviews/latest", async (req, res, next) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 3, 12);
+    const reviews = await Consultation.aggregate([
+      { $unwind: "$reviews" },
+      { $match: { "reviews.comment": { $nin: [null, ""] }, "reviews.rating": { $gte: 4 } } },
+      { $sort: { "reviews.createdAt": -1 } },
+      { $limit: limit },
+      {
+        $project: {
+          _id: 0,
+          id: { $toString: "$reviews._id" },
+          consultationId: { $toString: "$_id" },
+          topic: 1,
+          nickname: "$reviews.nickname",
+          rating: "$reviews.rating",
+          comment: "$reviews.comment",
+          createdAt: "$reviews.createdAt",
+        },
+      },
+    ]);
+    res.json(reviews);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Занятое время консультации в диапазоне дат: клиент показывает свободные слоты
+router.get("/:id/slots", async (req, res, next) => {
+  try {
+    const from = new Date(req.query.from || Date.now());
+    const to = new Date(req.query.to || from.getTime() + 14 * 24 * 60 * 60 * 1000);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+      return res.status(400).json({ message: "Некорректный диапазон дат" });
+    }
+    const busy = await Booking.find({
+      consultation: req.params.id,
+      status: { $ne: "cancelled" },
+      scheduledAt: { $gte: from, $lte: to },
+    }).distinct("scheduledAt");
+    res.json(busy.map((d) => new Date(d).toISOString()));
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /consultations/:id → Model.findById(id)
 router.get("/:id", async (req, res, next) => {
   try {
@@ -132,7 +179,8 @@ router.delete("/:id", authenticateToken, isAdmin, async (req, res, next) => {
 
 // ===== Вложенный массив reviews =====
 
-// Добавление отзыва: $push во вложенный массив
+// Добавление отзыва: $push во вложенный массив.
+// Один отзыв на пользователя: условие "reviews.user": { $ne } не даёт добавить второй
 router.post("/:id/reviews", authenticateToken, async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id).select("profile");
@@ -142,12 +190,19 @@ router.post("/:id/reviews", authenticateToken, async (req, res, next) => {
       rating: Number(req.body.rating),
       comment: req.body.comment,
     };
-    const consultation = await Consultation.findByIdAndUpdate(
-      req.params.id,
+    const consultation = await Consultation.findOneAndUpdate(
+      { _id: req.params.id, "reviews.user": { $ne: req.user.id } },
       { $push: { reviews: review } },
       { returnDocument: "after", runValidators: true },
     );
-    if (!consultation) return notFound(res, req.params.id);
+    if (!consultation) {
+      if (await Consultation.exists({ _id: req.params.id })) {
+        return res
+          .status(400)
+          .json({ message: "Вы уже оставили отзыв — его можно изменить" });
+      }
+      return notFound(res, req.params.id);
+    }
     res.status(201).json(consultation.reviews.at(-1));
   } catch (err) {
     next(err);

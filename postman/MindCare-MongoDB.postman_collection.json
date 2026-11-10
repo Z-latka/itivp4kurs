@@ -32,6 +32,10 @@
     {
       "key": "questionId",
       "value": ""
+    },
+    {
+      "key": "moodId",
+      "value": ""
     }
   ],
   "item": [
@@ -705,6 +709,75 @@
           }
         },
         {
+          "name": "Занятое время консультации",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/consultations/{{consultationId}}/slots",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultations",
+                "{{consultationId}}",
+                "slots"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Повторная запись на то же время → 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 409\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"consultationId\": \"{{consultationId}}\",\n  \"scheduledAt\": \"2027-02-01T10:00:00.000Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/bookings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "bookings"
+              ]
+            }
+          }
+        },
+        {
           "name": "Мои записи (populate)",
           "event": [
             {
@@ -1038,7 +1111,165 @@
       ]
     },
     {
-      "name": "6. Удаление",
+      "name": "6. Дневник настроения (массив moods)",
+      "item": [
+        {
+          "name": "Новая запись за день — $push",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"moodId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2027-01-01\",\n  \"mood\": 2,\n  \"feelings\": [\n    \"тревога\",\n    \"усталость\"\n  ],\n  \"note\": \"Тяжёлый день\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/moods",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "moods"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Та же дата — обновление элемента по $",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Тот же элемент массива\", () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"moodId\")));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2027-01-01\",\n  \"mood\": 4,\n  \"feelings\": [\n    \"спокойствие\"\n  ],\n  \"note\": \"Вечером стало лучше\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/moods",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "moods"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Записи и сводка (aggregation $facet)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/moods?days=3650",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "moods"
+              ],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "3650"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "$pull — удалить запись",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/moods/{{moodId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "moods",
+                "{{moodId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Удаление",
       "item": [
         {
           "name": "$pull — удалить отзыв",

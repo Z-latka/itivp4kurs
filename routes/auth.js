@@ -75,8 +75,8 @@ router.post("/login", async (req, res, next) => {
 
 router.get("/profile", authenticateToken, async (req, res, next) => {
   try {
-    // Проекция: историю тестов не загружаем
-    const user = await User.findById(req.user.id).select("-testResults");
+    // Проекция: историю тестов и дневник не загружаем
+    const user = await User.findById(req.user.id).select("-testResults -moods");
     if (!user) {
       return res.status(404).json({ message: "Пользователь не найден" });
     }
@@ -88,7 +88,7 @@ router.get("/profile", authenticateToken, async (req, res, next) => {
 
 router.put("/profile", authenticateToken, async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.id).select("-testResults");
+    const user = await User.findById(req.user.id).select("-testResults -moods");
     if (!user) {
       return res.status(404).json({ message: "Пользователь не найден" });
     }
