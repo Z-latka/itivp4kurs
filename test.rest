@@ -2,6 +2,10 @@
 # Токены берутся из ответов /auth/login (поле token)
 @userToken = <вставьте token клиента>
 @adminToken = <вставьте token администратора>
+@consultationId = <_id консультации из GET /consultations>
+@bookingId = <_id записи>
+@questionId = <_id обращения>
+@reviewId = <_id отзыва>
 
 ### Регистрация клиента (роль всегда user)
 POST {{baseUrl}}/auth/register
@@ -60,7 +64,7 @@ Content-Type: application/json
 GET {{baseUrl}}/consultations
 
 ###
-GET {{baseUrl}}/consultations/1
+GET {{baseUrl}}/consultations/{{consultationId}}
 
 ### Создание (только admin)
 POST {{baseUrl}}/consultations
@@ -76,7 +80,7 @@ Content-Type: application/json
 }
 
 ### Обновление (только admin)
-PUT {{baseUrl}}/consultations/1
+PUT {{baseUrl}}/consultations/{{consultationId}}
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
@@ -88,11 +92,11 @@ Content-Type: application/json
 }
 
 ### Удаление (только admin)
-DELETE {{baseUrl}}/consultations/1
+DELETE {{baseUrl}}/consultations/{{consultationId}}
 Authorization: Bearer {{adminToken}}
 
 ### Отзыв
-POST {{baseUrl}}/consultations/2/reviews
+POST {{baseUrl}}/consultations/{{consultationId}}/reviews
 Authorization: Bearer {{userToken}}
 Content-Type: application/json
 
@@ -107,7 +111,7 @@ Authorization: Bearer {{userToken}}
 Content-Type: application/json
 
 {
-  "consultationId": 2,
+  "consultationId": "{{consultationId}}",
   "scheduledAt": "2027-01-15T10:00:00Z",
   "format": "video",
   "comment": "Хочу разобраться с тревогой"
@@ -118,7 +122,7 @@ GET {{baseUrl}}/bookings/my
 Authorization: Bearer {{userToken}}
 
 ###
-PATCH {{baseUrl}}/bookings/1/cancel
+PATCH {{baseUrl}}/bookings/{{bookingId}}/cancel
 Authorization: Bearer {{userToken}}
 
 ### Все записи (admin)
@@ -126,7 +130,7 @@ GET {{baseUrl}}/bookings
 Authorization: Bearer {{adminToken}}
 
 ###
-PATCH {{baseUrl}}/bookings/1/status
+PATCH {{baseUrl}}/bookings/{{bookingId}}/status
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
@@ -176,7 +180,7 @@ GET {{baseUrl}}/questions/my
 Authorization: Bearer {{userToken}}
 
 ### Ответ психолога
-POST {{baseUrl}}/questions/1/messages
+POST {{baseUrl}}/questions/{{questionId}}/messages
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
@@ -189,8 +193,33 @@ GET {{baseUrl}}/questions
 Authorization: Bearer {{adminToken}}
 
 ###
-PATCH {{baseUrl}}/questions/1/close
+PATCH {{baseUrl}}/questions/{{questionId}}/close
 Authorization: Bearer {{userToken}}
 
 ###
 GET {{baseUrl}}/stats
+
+### ===== MongoDB: вложенные массивы =====
+### Изменение элемента массива (позиционный $)
+PATCH {{baseUrl}}/consultations/{{consultationId}}/reviews/{{reviewId}}
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "rating": 4
+}
+
+### $addToSet тегов
+POST {{baseUrl}}/consultations/{{consultationId}}/tags
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "tags": ["тревога", "экзамены"]
+}
+
+### Поиск по элементу массива
+GET {{baseUrl}}/consultations?tag=тревога
+
+### Aggregation pipeline
+GET {{baseUrl}}/consultations/stats/tags

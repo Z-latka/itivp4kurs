@@ -1,16 +1,11 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const mongoose = require("mongoose");
 const app = express();
 const PORT = process.env.PORT || 3000;
-const {
-  sequelize,
-  User,
-  Consultation,
-  Booking,
-  TestResult,
-  Question,
-} = require("./models");
+const connectDB = require("./db");
+const { User, Consultation, Booking, Question } = require("./models");
 const consultationsRouter = require("./routes/consultations");
 const authRouter = require("./routes/auth");
 const bookingsRouter = require("./routes/bookings");
@@ -21,22 +16,38 @@ app.use(express.json());
 app.use(cors());
 
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", server: "psychology-api", port: PORT });
+  res.json({
+    status: "ok",
+    server: "psychology-api",
+    port: PORT,
+    database: "MongoDB",
+    connected: mongoose.connection.readyState === 1,
+  });
 });
 
 // Общая статистика сервиса для главной страницы и панели психолога
 app.get("/api/stats", async (req, res, next) => {
   try {
-    const [users, consultations, bookings, testsTaken, questions, openQuestions] =
+    const [users, consultations, bookings, questions, openQuestions, tests] =
       await Promise.all([
-        User.count(),
-        Consultation.count(),
-        Booking.count(),
-        TestResult.count(),
-        Question.count(),
-        Question.count({ where: { status: "open" } }),
+        User.countDocuments(),
+        Consultation.countDocuments(),
+        Booking.countDocuments(),
+        Question.countDocuments(),
+        Question.countDocuments({ status: "open" }),
+        // Сумма длин вложенных массивов testResults по всем пользователям
+        User.aggregate([
+          { $group: { _id: null, total: { $sum: { $size: "$testResults" } } } },
+        ]),
       ]);
-    res.json({ users, consultations, bookings, testsTaken, questions, openQuestions });
+    res.json({
+      users,
+      consultations,
+      bookings,
+      testsTaken: tests[0]?.total || 0,
+      questions,
+      openQuestions,
+    });
   } catch (err) {
     next(err);
   }
@@ -56,14 +67,27 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  // Ошибки валидации Sequelize и неверный формат id — это ошибки клиента
-  if (
-    err.name === "SequelizeValidationError" ||
-    err.name === "SequelizeDatabaseError"
-  ) {
+  // Некорректный ObjectId в параметрах запроса
+  if (err instanceof mongoose.Error.CastError) {
     return res.status(400).json({
       error: "Неверные данные запроса",
-      message: err.errors ? err.errors.map((e) => e.message).join("; ") : err.message,
+      message: `Некорректное значение поля ${err.path}: ${err.value}`,
+    });
+  }
+  // Нарушение правил схемы (required, min/max, enum, match)
+  if (err instanceof mongoose.Error.ValidationError) {
+    return res.status(400).json({
+      error: "Ошибка валидации",
+      message: Object.values(err.errors)
+        .map((e) => e.message)
+        .join("; "),
+    });
+  }
+  // Дубликат уникального индекса
+  if (err.code === 11000) {
+    return res.status(409).json({
+      error: "Конфликт данных",
+      message: `Значение поля ${Object.keys(err.keyValue || {}).join(", ")} уже занято`,
     });
   }
   console.error(err.stack);
@@ -73,15 +97,13 @@ app.use((err, req, res, next) => {
   });
 });
 
-sequelize
-  .authenticate()
+connectDB()
   .then(() => {
-    console.log("База данных PostgreSQL успешно подключена.");
+    app.listen(PORT, () => {
+      console.log(`Сервер запущен на http://localhost:${PORT}`);
+    });
   })
   .catch((err) => {
-    console.error("Ошибка подключения к базе данных:", err);
+    console.error("MongoDB connection error:", err.message);
+    process.exit(1);
   });
-
-app.listen(PORT, () => {
-  console.log(`Сервер запущен на http://localhost:${PORT}`);
-});

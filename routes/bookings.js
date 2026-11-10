@@ -1,9 +1,8 @@
 const express = require("express");
 const router = express.Router();
-const { Booking, Consultation, User } = require("../models");
+const { Booking, Consultation } = require("../models");
 const { authenticateToken, isAdmin } = require("../middleware/auth");
 
-const FORMATS = ["chat", "video", "audio"];
 const STATUSES = ["pending", "confirmed", "completed", "cancelled"];
 
 router.use(authenticateToken);
@@ -12,7 +11,7 @@ router.use(authenticateToken);
 router.post("/", async (req, res, next) => {
   try {
     const { consultationId, scheduledAt, format, comment } = req.body;
-    const consultation = await Consultation.findByPk(consultationId);
+    const consultation = await Consultation.findById(consultationId).select("-reviews");
     if (!consultation) {
       return res.status(404).json({ message: "Консультация не найдена" });
     }
@@ -31,31 +30,27 @@ router.post("/", async (req, res, next) => {
         .status(400)
         .json({ message: "Нельзя записаться на прошедшее время" });
     }
-    if (format && !FORMATS.includes(format)) {
-      return res.status(400).json({ message: "Недопустимый формат связи" });
-    }
 
     const booking = await Booking.create({
-      userId: req.user.id,
-      consultationId: consultation.id,
+      user: req.user.id,
+      consultation: consultation._id,
       scheduledAt: date,
-      format: format || "chat",
-      comment: (comment || "").trim(),
+      format,
+      comment,
     });
-    res.status(201).json({ ...booking.toJSON(), consultation });
+    await booking.populate("consultation", "-reviews");
+    res.status(201).json(booking);
   } catch (err) {
     next(err);
   }
 });
 
-// Мои записи
+// Мои записи: populate подставляет документ консультации вместо ObjectId
 router.get("/my", async (req, res, next) => {
   try {
-    const bookings = await Booking.findAll({
-      where: { userId: req.user.id },
-      include: [{ model: Consultation, as: "consultation" }],
-      order: [["scheduledAt", "DESC"]],
-    });
+    const bookings = await Booking.find({ user: req.user.id })
+      .populate("consultation", "-reviews")
+      .sort({ scheduledAt: -1 });
     res.json(bookings);
   } catch (err) {
     next(err);
@@ -65,8 +60,11 @@ router.get("/my", async (req, res, next) => {
 // Отмена своей записи
 router.patch("/:id/cancel", async (req, res, next) => {
   try {
-    const booking = await Booking.findByPk(req.params.id);
-    if (!booking || (booking.userId !== req.user.id && req.user.role !== "admin")) {
+    const booking = await Booking.findById(req.params.id);
+    if (
+      !booking ||
+      (String(booking.user) !== req.user.id && req.user.role !== "admin")
+    ) {
       return res.status(404).json({ message: "Запись не найдена" });
     }
     if (booking.status === "completed") {
@@ -74,25 +72,30 @@ router.patch("/:id/cancel", async (req, res, next) => {
         .status(400)
         .json({ message: "Завершённую консультацию нельзя отменить" });
     }
-    await booking.update({ status: "cancelled" });
+    booking.status = "cancelled";
+    await booking.save();
     res.json(booking);
   } catch (err) {
     next(err);
   }
 });
 
-// Все записи (для психолога/администратора)
+// Все записи (для психолога). Из пользователя берём только псевдоним
 router.get("/", isAdmin, async (req, res, next) => {
   try {
-    const bookings = await Booking.findAll({
-      include: [
-        { model: Consultation, as: "consultation" },
-        // Психолог видит только псевдоним — анонимность клиента сохраняется
-        { model: User, as: "user", attributes: ["id", "nickname"] },
-      ],
-      order: [["scheduledAt", "ASC"]],
-    });
-    res.json(bookings);
+    const filter = req.query.status ? { status: req.query.status } : {};
+    const bookings = await Booking.find(filter)
+      .populate("consultation", "topic specialist price duration")
+      .populate("user", "profile.nickname")
+      .sort({ scheduledAt: 1 })
+      .lean({ virtuals: false });
+    res.json(
+      bookings.map((b) => ({
+        ...b,
+        id: String(b._id),
+        user: b.user && { id: String(b.user._id), nickname: b.user.profile?.nickname },
+      })),
+    );
   } catch (err) {
     next(err);
   }
@@ -104,11 +107,14 @@ router.patch("/:id/status", isAdmin, async (req, res, next) => {
     if (!STATUSES.includes(status)) {
       return res.status(400).json({ message: "Недопустимый статус" });
     }
-    const booking = await Booking.findByPk(req.params.id);
+    const booking = await Booking.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { returnDocument: "after" },
+    );
     if (!booking) {
       return res.status(404).json({ message: "Запись не найдена" });
     }
-    await booking.update({ status });
     res.json(booking);
   } catch (err) {
     next(err);
