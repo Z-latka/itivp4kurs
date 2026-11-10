@@ -4,15 +4,15 @@
 личный кабинет и панель психолога.
 
 **Ветка `26` — Лабораторная работа №6: интеграция с MongoDB (Mongoose).**
-Сервер из предыдущих работ (ветка `25`, PostgreSQL + Sequelize) скопирован,
-и слой данных заменён на MongoDB + Mongoose. REST API и React-клиент
-остались прежними — тот же фронтенд работает с обеими реализациями.
+В этой ветке сайт доработан до полноценного сервиса (сначала на PostgreSQL +
+Sequelize), а затем слой данных заменён на MongoDB + Mongoose. REST API и
+React-клиент при замене не менялись.
 
 | Ветка | Содержание |
 |-------|------------|
-| `lab21` … `24` | REST API, PostgreSQL/Sequelize, JWT + роли, React-клиент |
-| `25` | Полноценный сайт на PostgreSQL (ЛР5 + доработка функционала) |
-| **`26`** | **Тот же API на MongoDB / Mongoose (ЛР6)** |
+| `lab21` … `24` | REST API, PostgreSQL/Sequelize, JWT + роли, состояние в React |
+| `25` | ЛР5: React-клиент, интеграция с REST API |
+| **`26`** | **Доработка сайта + ЛР6: MongoDB / Mongoose** |
 
 ## Возможности сайта
 
@@ -139,7 +139,7 @@ postman/                  коллекция Postman для проверки API
 
 ## PostgreSQL vs MongoDB: одни и те же данные
 
-| Данные | PostgreSQL (ветка 25) | MongoDB (ветка 26) |
+| Данные | PostgreSQL (коммит `7244a9b`) | MongoDB (ветка 26) |
 |--------|-----------------------|--------------------|
 | Отзывы | таблица `Reviews` (FK `consultationId`, `userId`), рейтинг — `JOIN` + `AVG` + `GROUP BY` | массив `reviews[]` внутри документа консультации, рейтинг считается из документа |
 | Переписка | таблицы `Questions` + `Messages`, чтение через `JOIN` | массив `messages[]` внутри обращения, читается одним запросом |
@@ -190,14 +190,17 @@ postman/                  коллекция Postman для проверки API
 
 Также есть `test.rest` для расширения VS Code REST Client.
 
-## Запуск ветки 25 (PostgreSQL)
+## Версия сайта на PostgreSQL
+
+Доработанный сайт до перехода на MongoDB сохранён в истории ветки 26,
+в коммите «Полноценный сайт MindCare» (`7244a9b`):
 
 ```bash
-git checkout 25
+git checkout 7244a9b
 npm install
 npx sequelize-cli db:migrate
 npx sequelize-cli db:seed --seed 20261110101000-admin-and-catalog.js
 npm run dev
 ```
 
-Параметры подключения — в `config/config.js`.
+Параметры подключения — в `config/config.js`. Вернуться к MongoDB: `git checkout 26`.
