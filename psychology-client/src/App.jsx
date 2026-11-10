@@ -1,26 +1,78 @@
-import { useState } from "react";
 import Header from "./components/Header";
+import CrisisNote from "./components/CrisisNote";
 import Home from "./pages/Home";
-import ConsultationsPage from "./components/ConsultationList";
+import CatalogPage from "./pages/Catalog";
 import TestsPage from "./pages/Tests";
+import QuestionsPage from "./pages/Questions";
+import ProfilePage from "./pages/Profile";
+import AdminPage from "./pages/Admin";
 import AuthPage from "./pages/Auth";
+import { navigate, useRoute } from "./router";
+import { useAuth } from "./auth/context";
+
+const PAGES = {
+  home: Home,
+  consultations: CatalogPage,
+  tests: TestsPage,
+  ask: QuestionsPage,
+  profile: ProfilePage,
+  admin: AdminPage,
+  auth: AuthPage,
+};
+
+// Страницы, доступные только после входа
+const PRIVATE = ["profile", "admin"];
+
+function NotFound() {
+  return (
+    <section className="page empty-state">
+      <div className="empty-icon">🧭</div>
+      <h3>Страница не найдена</h3>
+      <p>Возможно, ссылка устарела.</p>
+      <button className="btn btn-primary" onClick={() => navigate("")}>
+        На главную
+      </button>
+    </section>
+  );
+}
 
 export default function App() {
-  const [page, setPage] = useState("home");
+  const route = useRoute();
+  const { user, checking } = useAuth();
+  const Page = PAGES[route.page] || NotFound;
+
+  let content = <Page param={route.param} query={route.query} />;
+  if (checking) {
+    content = (
+      <div className="loading-state">
+        <div className="spinner"></div>
+      </div>
+    );
+  } else if (PRIVATE.includes(route.page) && !user) {
+    content = <AuthPage query={{ next: route.page }} />;
+  }
+
+  const link = (to, label) => (
+    <a
+      href={`#/${to}`}
+      onClick={(e) => {
+        e.preventDefault();
+        navigate(to);
+      }}
+    >
+      {label}
+    </a>
+  );
 
   return (
     <div className="app">
-      <Header currentPage={page} onNavigate={setPage} />
+      <Header currentPage={route.page} />
       <main className="main-content">
-        <div className="container">
-          {page === "home" && <Home />}
-          {page === "consultations" && <ConsultationsPage />}
-          {page === "tests" && <TestsPage />}
-          {page === "auth" && <AuthPage />}
-        </div>
+        <div className="container">{content}</div>
       </main>
       <footer className="app-footer">
         <div className="container">
+          <CrisisNote />
           <div className="footer-content">
             <div className="footer-brand">
               <span className="logo-icon">🌿</span>
@@ -32,18 +84,11 @@ export default function App() {
             </p>
           </div>
           <div className="footer-links">
-            <a href="#" onClick={(e) => { e.preventDefault(); setPage("home"); }}>
-              Главная
-            </a>
-            <a href="#" onClick={(e) => { e.preventDefault(); setPage("consultations"); }}>
-              Консультации
-            </a>
-            <a href="#" onClick={(e) => { e.preventDefault(); setPage("tests"); }}>
-              Тесты
-            </a>
-            <a href="#" onClick={(e) => { e.preventDefault(); setPage("auth"); }}>
-              Вход
-            </a>
+            {link("", "Главная")}
+            {link("consultations", "Консультации")}
+            {link("tests", "Тесты")}
+            {link("ask", "Анонимный вопрос")}
+            {user ? link("profile", "Кабинет") : link("auth", "Вход")}
           </div>
         </div>
         <div className="container">
@@ -72,12 +117,13 @@ export default function App() {
           margin-top: auto;
           border-top: 1px solid var(--border);
           background: var(--bg-card);
+          padding-top: 1.5rem;
         }
         .footer-content {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 2rem 0;
+          padding: 2rem 0 1rem;
           flex-wrap: wrap;
           gap: 1.5rem;
         }
@@ -106,6 +152,7 @@ export default function App() {
         }
         .footer-links {
           display: flex;
+          flex-wrap: wrap;
           gap: 1.5rem;
         }
         .footer-links a {

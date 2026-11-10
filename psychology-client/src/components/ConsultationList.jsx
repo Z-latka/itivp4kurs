@@ -12,6 +12,7 @@ const INITIAL_FORM = {
   duration: "",
   status: "available",
   price: "",
+  specialist: "",
 };
 
 const DELAY = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -23,7 +24,6 @@ const requestWithRetry = async (fn, retries = 3, delayMs = 1000) => {
       return await fn();
     } catch (err) {
       lastError = err;
-      // Ошибки клиента (4xx) повторять бессмысленно: повтор нужен только при сбое сети или 5xx
       if (err.response && err.response.status < 500) break;
       if (attempt < retries) {
         await DELAY(delayMs);
@@ -90,7 +90,7 @@ export default function ConsultationsPage() {
 
   const handleAdd = async (e) => {
     e.preventDefault();
-    if (!form.topic.trim() || !form.duration.trim()) return;
+    if (!form.topic.trim() || !String(form.duration).trim()) return;
 
     setNotify(null);
     const optimisticItem = {
@@ -100,6 +100,7 @@ export default function ConsultationsPage() {
       duration: Number(form.duration),
       status: form.status,
       price: Number(form.price) || 0,
+      specialist: form.specialist,
       isOptimistic: true,
     };
 
@@ -114,6 +115,7 @@ export default function ConsultationsPage() {
           duration: Number(form.duration),
           status: form.status,
           price: Number(form.price) || 0,
+          specialist: form.specialist,
         }),
       );
       setConsultations((prev) =>
@@ -165,6 +167,7 @@ export default function ConsultationsPage() {
       duration: String(item.duration || ""),
       status: item.status,
       price: String(item.price || ""),
+      specialist: item.specialist || "",
     });
   };
 
@@ -175,7 +178,7 @@ export default function ConsultationsPage() {
 
   const handleEditSave = async (e) => {
     e.preventDefault();
-    if (!form.topic.trim() || !form.duration.trim()) return;
+    if (!form.topic.trim() || !String(form.duration).trim()) return;
 
     setNotify(null);
     const previous = consultations.find((c) => c.id === editingId);
@@ -188,6 +191,7 @@ export default function ConsultationsPage() {
       duration: Number(form.duration),
       status: form.status,
       price: Number(form.price) || 0,
+      specialist: form.specialist,
     };
     setConsultations((prev) =>
       prev.map((c) => (c.id === editingId ? optimisticUpdated : c)),
@@ -202,6 +206,7 @@ export default function ConsultationsPage() {
           duration: Number(form.duration),
           status: form.status,
           price: Number(form.price) || 0,
+          specialist: form.specialist,
         }),
       );
       setConsultations((prev) =>
@@ -228,7 +233,7 @@ export default function ConsultationsPage() {
     <section className="page consultations">
       <div className="page-header">
         <div>
-          <h2>Консультации</h2>
+          <h2>Каталог консультаций</h2>
           <p>Управление консультациями с сервером через REST API</p>
         </div>
         <button
@@ -292,17 +297,21 @@ export default function ConsultationsPage() {
             </div>
             <div className="stat-card">
               <div className="stat-value">
-                {consultations.filter(
-                  (c) => (c.status || "").toLowerCase() === "active",
-                ).length}
+                {
+                  consultations.filter(
+                    (c) => (c.status || "").toLowerCase() === "active",
+                  ).length
+                }
               </div>
               <div className="stat-label">Активных</div>
             </div>
             <div className="stat-card">
               <div className="stat-value">
-                {consultations.filter(
-                  (c) => (c.status || "").toLowerCase() === "completed",
-                ).length}
+                {
+                  consultations.filter(
+                    (c) => (c.status || "").toLowerCase() === "completed",
+                  ).length
+                }
               </div>
               <div className="stat-label">Завершённых</div>
             </div>
@@ -314,7 +323,9 @@ export default function ConsultationsPage() {
             className="add-form card"
             style={{ marginBottom: "2rem" }}
           >
-            <h3 style={{ marginTop: 0, marginBottom: "1rem" }}>Добавить консультацию</h3>
+            <h3 style={{ marginTop: 0, marginBottom: "1rem" }}>
+              Добавить консультацию
+            </h3>
             <div className="form-grid">
               <div className="form-group">
                 <label>Тема консультации</label>
@@ -343,7 +354,9 @@ export default function ConsultationsPage() {
                   type="number"
                   placeholder="60"
                   value={form.duration}
-                  onChange={(e) => setForm({ ...form, duration: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, duration: e.target.value })
+                  }
                   required
                 />
               </div>
@@ -358,6 +371,15 @@ export default function ConsultationsPage() {
                   <option value="available">Доступна</option>
                   <option value="busy">Занята</option>
                 </select>
+              </div>
+              <div className="form-group">
+                <label>Специалист</label>
+                <input
+                  type="text"
+                  placeholder="ФИО и специализация"
+                  value={form.specialist}
+                  onChange={(e) => setForm({ ...form, specialist: e.target.value })}
+                />
               </div>
               <div className="form-group">
                 <label>Цена (руб.)</label>
@@ -445,6 +467,16 @@ export default function ConsultationsPage() {
                               </select>
                             </div>
                             <div className="form-group">
+                              <label>Специалист</label>
+                              <input
+                                type="text"
+                                value={form.specialist}
+                                onChange={(e) =>
+                                  setForm({ ...form, specialist: e.target.value })
+                                }
+                              />
+                            </div>
+                            <div className="form-group">
                               <label>Цена (руб.)</label>
                               <input
                                 type="number"
@@ -507,6 +539,9 @@ export default function ConsultationsPage() {
                         </div>
                       </div>
                       <div className="card-body">
+                        {item.specialist && (
+                          <p className="specialist">👩‍⚕️ {item.specialist}</p>
+                        )}
                         <p className="card-description">
                           {item.description || "Описание не указано"}
                         </p>

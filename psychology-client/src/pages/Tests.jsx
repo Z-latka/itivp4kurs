@@ -1,81 +1,20 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { errorMessage, fetchTest, fetchTests, submitTest } from "../api";
+import { navigate } from "../router";
+import { useAuth } from "../auth/context";
+import CrisisNote from "../components/CrisisNote";
 
-const TESTS = [
-  {
-    id: "anxiety",
-    title: "Тест на уровень тревожности",
-    description:
-      "Оцените свой уровень тревожности за последние две недели. 7 вопросов, результат сразу.",
-    icon: "😰",
-    color: "#1565c0",
-  },
-  {
-    id: "depression",
-    title: "Тест на депрессию",
-    description:
-      "Простой скрининг для оценки эмоционального состояния и признаков депрессии.",
-    icon: "🌧",
-    color: "#7d3c98",
-  },
-  {
-    id: "burnout",
-    title: "Тест на эмоциональное выгорание",
-    description:
-      "Проверьте, не испытываете ли вы профессиональное выгорание и хроническую усталость.",
-    icon: "🔥",
-    color: "#c62828",
-  },
-  {
-    id: "sleep",
-    title: "Тест качества сна",
-    description:
-      "Оцените качество вашего сна и получите рекомендации по его улучшению.",
-    icon: "😴",
-    color: "#2e7d32",
-  },
-];
+function TestsList() {
+  const [tests, setTests] = useState([]);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-export default function TestsPage() {
-  const [selectedTest, setSelectedTest] = useState(null);
-
-  if (selectedTest) {
-    return (
-      <section className="page tests">
-        <nav className="tests-nav">
-          <button
-            className="btn btn-outline btn-sm"
-            onClick={() => setSelectedTest(null)}
-          >
-            ← Назад к тестам
-          </button>
-        </nav>
-        <div className="test-detail card">
-          <div className="test-header" style={{ borderBottom: "1px solid var(--border)", paddingBottom: "1rem", marginBottom: "1.5rem" }}>
-            <span className="test-icon">{selectedTest.icon}</span>
-            <h2>{selectedTest.title}</h2>
-            <p className="test-desc">{selectedTest.description}</p>
-          </div>
-          <div className="test-questions">
-            <p className="placeholder">
-              Здесь будет интерактивный тест с вопросами и подсчётом результата.
-              (Демо-версия — функционал тестов в разработке.)
-            </p>
-          </div>
-          <div className="test-actions" style={{ marginTop: "2rem" }}>
-            <button
-              className="btn btn-primary"
-              onClick={() => {
-                alert("Тест пройден! Результат: низкий уровень тревожности. Рекомендуем записаться на консультацию для профилактики.");
-                setSelectedTest(null);
-              }}
-            >
-              Завершить тест
-            </button>
-          </div>
-        </div>
-      </section>
-    );
-  }
+  useEffect(() => {
+    fetchTests()
+      .then(({ data }) => setTests(data))
+      .catch((err) => setError(errorMessage(err)))
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <section className="page tests">
@@ -85,12 +24,14 @@ export default function TestsPage() {
           <p>Пройдите бесплатное тестирование для оценки своего эмоционального состояния</p>
         </div>
       </div>
+      {loading && <div className="loading-state"><div className="spinner"></div></div>}
+      {error && <div className="alert alert-error">⚠ {error}</div>}
       <div className="tests-grid">
-        {TESTS.map((test) => (
+        {tests.map((test) => (
           <div
             key={test.id}
             className="test-card"
-            onClick={() => setSelectedTest(test)}
+            onClick={() => navigate(`tests/${test.id}`)}
             style={{ cursor: "pointer" }}
           >
             <div className="test-icon-box" style={{ background: `${test.color}15`, color: test.color }}>
@@ -100,6 +41,9 @@ export default function TestsPage() {
             <p>{test.description}</p>
             <div className="test-footer">
               <span>Начать тест →</span>
+              <span className="muted small">
+                {test.questionsCount} вопросов · ~{test.minutes} мин
+              </span>
             </div>
           </div>
         ))}
@@ -113,4 +57,157 @@ export default function TestsPage() {
       </div>
     </section>
   );
+}
+
+function TestResultView({ test, result, onRestart }) {
+  const { user } = useAuth();
+  const percent = Math.round((result.score / result.maxScore) * 100);
+
+  return (
+    <div className="test-detail card">
+      <div className="test-header">
+        <span className="test-icon">{test.icon}</span>
+        <h2>{result.levelTitle}</h2>
+        <p className="test-desc">{test.title}</p>
+      </div>
+      <div className="score">
+        <div className="score-bar">
+          <div className="score-fill" style={{ width: `${percent}%`, background: test.color }} />
+        </div>
+        <div className="muted small">
+          {result.score} из {result.maxScore} баллов
+        </div>
+      </div>
+      <p>{result.recommendation}</p>
+      {result.crisis && <CrisisNote strong />}
+      {result.saved ? (
+        <div className="alert alert-success">✓ Результат сохранён в личном кабинете</div>
+      ) : (
+        !user && (
+          <div className="alert alert-warning">
+            Войдите, чтобы сохранять результаты и отслеживать динамику.
+          </div>
+        )
+      )}
+      <div className="test-actions wrap">
+        <button className="btn btn-primary" onClick={() => navigate("consultations")}>
+          Записаться на консультацию
+        </button>
+        <button className="btn btn-outline" onClick={() => navigate("ask")}>
+          Задать вопрос анонимно
+        </button>
+        <button className="btn btn-outline" onClick={onRestart}>
+          Пройти заново
+        </button>
+        <button className="btn btn-outline" onClick={() => navigate("tests")}>
+          Другие тесты
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function TestRunner({ id }) {
+  const [test, setTest] = useState(null);
+  const [error, setError] = useState(null);
+  const [answers, setAnswers] = useState([]);
+  const [step, setStep] = useState(0);
+  const [result, setResult] = useState(null);
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    fetchTest(id)
+      .then(({ data }) => setTest(data))
+      .catch((err) => setError(errorMessage(err, "Тест не найден")));
+  }, [id]);
+
+  if (error) {
+    return (
+      <section className="page">
+        <div className="alert alert-error">⚠ {error}</div>
+        <button className="btn btn-outline" onClick={() => navigate("tests")}>← Назад к тестам</button>
+      </section>
+    );
+  }
+  if (!test) return <div className="loading-state"><div className="spinner"></div></div>;
+
+  const restart = () => {
+    setAnswers([]);
+    setStep(0);
+    setResult(null);
+  };
+
+  const total = test.questions.length;
+  const question = test.questions[step];
+  const isLast = step === total - 1;
+
+  const choose = async (value) => {
+    const next = [...answers];
+    next[step] = value;
+    setAnswers(next);
+    if (!isLast) {
+      setStep(step + 1);
+      return;
+    }
+    setSending(true);
+    try {
+      const { data } = await submitTest(test.id, next);
+      setResult(data);
+    } catch (err) {
+      setError(errorMessage(err, "Не удалось отправить ответы"));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <section className="page tests">
+      <nav className="tests-nav">
+        <button className="btn btn-outline btn-sm" onClick={() => navigate("tests")}>
+          ← Назад к тестам
+        </button>
+      </nav>
+      {result ? (
+        <TestResultView test={test} result={result} onRestart={restart} />
+      ) : (
+        <div className="test-detail card">
+          <div className="test-header">
+            <span className="test-icon">{test.icon}</span>
+            <h2>{test.title}</h2>
+            <p className="test-desc">Как часто за последнее время вас беспокоило следующее?</p>
+          </div>
+          <div className="progress">
+            <div className="progress-fill" style={{ width: `${(step / total) * 100}%` }} />
+          </div>
+          <div className="muted small">Вопрос {step + 1} из {total}</div>
+          <h3 className="question-text">{question.text}</h3>
+          <div className="options">
+            {test.options.map((o) => (
+              <button
+                key={o.value}
+                className={`option${answers[step] === o.value ? " selected" : ""}`}
+                disabled={sending}
+                onClick={() => choose(o.value)}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <div className="test-actions">
+            <button
+              className="btn btn-outline btn-sm"
+              disabled={step === 0 || sending}
+              onClick={() => setStep(step - 1)}
+            >
+              ← Предыдущий вопрос
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+export default function TestsPage({ param }) {
+  return param ? <TestRunner key={param} id={param} /> : <TestsList />;
 }

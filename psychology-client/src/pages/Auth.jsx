@@ -1,18 +1,20 @@
 import { useState } from "react";
-import { login, register } from "../api";
+import { errorMessage, login, register } from "../api";
+import { useAuth } from "../auth/context";
+import { navigate } from "../router";
 
 const INITIAL_FORM = {
   email: "",
   password: "",
-  role: "user",
+  nickname: "",
 };
 
-export default function AuthPage() {
-  const [mode, setMode] = useState("login");
+export default function AuthPage({ query = {} }) {
+  const { signIn } = useAuth();
+  const [mode, setMode] = useState(query.mode === "register" ? "register" : "login");
   const [form, setForm] = useState(INITIAL_FORM);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -23,31 +25,17 @@ export default function AuthPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setSuccess(null);
 
     try {
-      if (mode === "login") {
-        const { data } = await login({
-          email: form.email,
-          password: form.password,
-        });
-        // JWT-токен сохраняется и затем подставляется перехватчиком axios
-        localStorage.setItem("token", data.token);
-        setSuccess("Вход выполнен успешно!");
-      } else {
-        await register({
-          email: form.email,
-          password: form.password,
-          role: form.role || "user",
-        });
-        setSuccess("Регистрация прошла успешно! Теперь вы можете войти.");
-      }
+      const { data } =
+        mode === "login"
+          ? await login({ email: form.email, password: form.password })
+          : await register(form);
+      // JWT-токен сохраняется и затем подставляется перехватчиком axios
+      signIn(data.token, data.user);
+      navigate(query.next || (data.user.role === "admin" ? "admin" : "profile"));
     } catch (err) {
-      setError(
-        err.response
-          ? err.response.data.message || "Ошибка при запросе к серверу"
-          : "Сервер недоступен. Проверьте подключение к интернету.",
-      );
+      setError(errorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -63,7 +51,7 @@ export default function AuthPage() {
             <p className="auth-subtitle">
               {mode === "login"
                 ? "Войдите в свой аккаунт для доступа к консультациям"
-                : "Зарегистрируйтесь, чтобы начать пользоваться сервисом"}
+                : "Психолог будет видеть только ваш псевдоним — не используйте настоящее имя"}
             </p>
           </div>
 
@@ -71,13 +59,6 @@ export default function AuthPage() {
             <div className="alert alert-error">
               <span>⚠</span>
               <span>{error}</span>
-            </div>
-          )}
-
-          {success && (
-            <div className="alert alert-success">
-              <span>✓</span>
-              <span>{success}</span>
             </div>
           )}
 
@@ -94,6 +75,19 @@ export default function AuthPage() {
                 autoComplete="email"
               />
             </div>
+            {mode === "register" && (
+              <div className="form-group">
+                <label>Псевдоним</label>
+                <input
+                  name="nickname"
+                  type="text"
+                  placeholder="Например: Тихий Лис"
+                  value={form.nickname}
+                  onChange={handleChange}
+                  maxLength={40}
+                />
+              </div>
+            )}
             <div className="form-group">
               <label>Пароль</label>
               <input
@@ -103,22 +97,10 @@ export default function AuthPage() {
                 value={form.password}
                 onChange={handleChange}
                 required
-                autoComplete="new-password"
+                minLength={mode === "register" ? 6 : undefined}
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
               />
             </div>
-            {mode === "register" && (
-              <div className="form-group">
-                <label>Роль</label>
-                <select
-                  name="role"
-                  value={form.role}
-                  onChange={handleChange}
-                >
-                  <option value="user">Пользователь</option>
-                  <option value="admin">Администратор</option>
-                </select>
-              </div>
-            )}
             <button
               type="submit"
               className={`btn btn-primary btn-full ${loading ? "loading" : ""}`}
@@ -135,7 +117,10 @@ export default function AuthPage() {
           <button
             type="button"
             className="btn btn-outline btn-full"
-            onClick={() => setMode(mode === "login" ? "register" : "login")}
+            onClick={() => {
+              setMode(mode === "login" ? "register" : "login");
+              setError(null);
+            }}
           >
             {mode === "login"
               ? "Ещё нет аккаунта? Зарегистрироваться"
@@ -144,8 +129,8 @@ export default function AuthPage() {
 
           <div className="auth-footer">
             <p>
-              Демонстрационный сервис психологической поддержки. Данные хранятся
-              на сервере и передаются по защищённому соединению.
+              Email нужен только для входа и не показывается психологу. Пароль
+              хранится на сервере в виде хэша bcrypt.
             </p>
           </div>
         </div>

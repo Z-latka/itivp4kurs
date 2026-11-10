@@ -3,7 +3,17 @@ const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
   class Consultation extends Model {
-    static associate(models) {}
+    static associate(models) {
+      Consultation.hasMany(models.Booking, {
+        foreignKey: "consultationId",
+        onDelete: "CASCADE",
+      });
+      Consultation.hasMany(models.Review, {
+        foreignKey: "consultationId",
+        as: "reviews",
+        onDelete: "CASCADE",
+      });
+    }
   }
   Consultation.init(
     {
@@ -24,6 +34,7 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.FLOAT,
         defaultValue: 0.0,
       },
+      specialist: DataTypes.STRING,
     },
     {
       sequelize,

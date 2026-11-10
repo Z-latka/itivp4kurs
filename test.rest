@@ -1,47 +1,53 @@
-@baseUrl = http://localhost:3000
-@authToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJ1c2VyMUBleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzkwODY2MDAyLCJleHAiOjE3OTA4Njk2MDJ9.ZQjLyiMsOw9Z1_fFMfmtf12LsWveSXTLd_on3Z26Bh4
+@baseUrl = http://localhost:3000/api
+# Токены берутся из ответов /auth/login (поле token)
+@userToken = <вставьте token клиента>
+@adminToken = <вставьте token администратора>
+
+### Регистрация клиента (роль всегда user)
 POST {{baseUrl}}/auth/register
 Content-Type: application/json
 
 {
   "email": "user1@example.com",
   "password": "Password123!",
-  "role": "user"
+  "nickname": "Тихий Лис"
 }
 
-
-###
-
-POST {{baseUrl}}/auth/register
-Content-Type: application/json
-
-{
-  "email": "admin@example.com",
-  "password": "AdminPassword123!",
-  "role": "admin"
-}
-
-###
-
+### Вход клиента
 POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
-  "email": "user1@example.com",
-  "password": "Password123!"
+  "email": "demo@mindcare.by",
+  "password": "Demo123!"
 }
 
-###
+### Вход администратора (психолога), создаётся сидером
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
 
+{
+  "email": "admin@mindcare.by",
+  "password": "Admin123!"
+}
+
+### Профиль без токена -> 401
 GET {{baseUrl}}/auth/profile
 
-###
-
+### Профиль
 GET {{baseUrl}}/auth/profile
-Authorization: Bearer {{authToken}}
+Authorization: Bearer {{userToken}}
 
-###
+### Смена псевдонима
+PUT {{baseUrl}}/auth/profile
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
 
+{
+  "nickname": "Ночная Сова"
+}
+
+### Неверный пароль
 POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
@@ -50,24 +56,28 @@ Content-Type: application/json
   "password": "WrongPassword!"
 }
 
-###
-
+### ===== Консультации =====
 GET {{baseUrl}}/consultations
 
 ###
+GET {{baseUrl}}/consultations/1
 
+### Создание (только admin)
 POST {{baseUrl}}/consultations
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {
   "topic": "Депрессия",
   "description": "Работа с депрессивными состояниями",
-  "duration": 90
+  "duration": 90,
+  "price": 120,
+  "specialist": "Анна Ковалёва"
 }
 
-###
-
+### Обновление (только admin)
 PUT {{baseUrl}}/consultations/1
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {
@@ -77,6 +87,110 @@ Content-Type: application/json
   "status": "busy"
 }
 
-###
-
+### Удаление (только admin)
 DELETE {{baseUrl}}/consultations/1
+Authorization: Bearer {{adminToken}}
+
+### Отзыв
+POST {{baseUrl}}/consultations/2/reviews
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "rating": 5,
+  "comment": "Очень помогло"
+}
+
+### ===== Записи =====
+POST {{baseUrl}}/bookings
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "consultationId": 2,
+  "scheduledAt": "2027-01-15T10:00:00Z",
+  "format": "video",
+  "comment": "Хочу разобраться с тревогой"
+}
+
+###
+GET {{baseUrl}}/bookings/my
+Authorization: Bearer {{userToken}}
+
+###
+PATCH {{baseUrl}}/bookings/1/cancel
+Authorization: Bearer {{userToken}}
+
+### Все записи (admin)
+GET {{baseUrl}}/bookings
+Authorization: Bearer {{adminToken}}
+
+###
+PATCH {{baseUrl}}/bookings/1/status
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "status": "confirmed"
+}
+
+### ===== Тесты =====
+GET {{baseUrl}}/tests
+
+###
+GET {{baseUrl}}/tests/anxiety
+
+### Гость: результат без сохранения
+POST {{baseUrl}}/tests/anxiety/submit
+Content-Type: application/json
+
+{
+  "answers": [1, 2, 1, 0, 1, 2, 1]
+}
+
+### Авторизованный: результат сохраняется
+POST {{baseUrl}}/tests/anxiety/submit
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "answers": [1, 2, 1, 0, 1, 2, 1]
+}
+
+###
+GET {{baseUrl}}/tests/results/my
+Authorization: Bearer {{userToken}}
+
+### ===== Анонимные обращения =====
+POST {{baseUrl}}/questions
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "topic": "Не могу уснуть",
+  "text": "Уже неделю сплю по 4 часа, мысли не дают покоя"
+}
+
+###
+GET {{baseUrl}}/questions/my
+Authorization: Bearer {{userToken}}
+
+### Ответ психолога
+POST {{baseUrl}}/questions/1/messages
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "text": "Здравствуйте! Давайте разберёмся вместе."
+}
+
+###
+GET {{baseUrl}}/questions
+Authorization: Bearer {{adminToken}}
+
+###
+PATCH {{baseUrl}}/questions/1/close
+Authorization: Bearer {{userToken}}
+
+###
+GET {{baseUrl}}/stats
