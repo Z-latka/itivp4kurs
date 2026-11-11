@@ -4,11 +4,13 @@ import { navigate } from "../router";
 import { useAuth } from "../auth/context";
 import { useTheme } from "../theme";
 import { Avatar } from "./ui";
+import SosDialog from "./SosDialog";
 
 export default function Header({ currentPage }) {
   const { user, isAdmin, isPsychologist, homePage, signOut } = useAuth();
   const { theme, toggle } = useTheme();
   const [open, setOpen] = useState(false);
+  const [sosOpen, setSosOpen] = useState(false);
 
   // Меню зависит от роли: сотрудникам — рабочие разделы, клиентам и гостям — сервисы
   const navLinks = isAdmin
@@ -79,17 +81,17 @@ export default function Header({ currentPage }) {
         </nav>
 
         <div className="nav-actions">
-          <a
-            href="#/help"
-            className="sos-link hide-mobile"
-            title="Помощь сейчас"
-            onClick={(e) => {
-              e.preventDefault();
-              go("help");
+          <button
+            className="sos-link"
+            title="Экстренная помощь"
+            aria-haspopup="dialog"
+            onClick={() => {
+              setOpen(false);
+              setSosOpen(true);
             }}
           >
             <LifeBuoy size={16} /> <span className="sos-text">Помощь сейчас</span>
-          </a>
+          </button>
           <button
             className="icon-btn"
             onClick={toggle}
@@ -137,6 +139,7 @@ export default function Header({ currentPage }) {
           </button>
         </div>
       </div>
+      <SosDialog open={sosOpen} onClose={() => setSosOpen(false)} />
     </header>
   );
 }

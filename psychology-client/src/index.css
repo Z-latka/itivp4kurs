@@ -1837,3 +1837,43 @@ button.chip.active {
 .bar-row .bar { grid-column: 1 / -1; height: 8px; border-radius: 999px; background: var(--bg-alt); overflow: hidden; }
 .bar-row .bar div { height: 100%; border-radius: 999px; background: var(--accent); }
 .staff-row.inactive { opacity: 0.6; }
+
+/* ===== Окно экстренной помощи ===== */
+.sos-modal { max-width: 480px; }
+.sos-modal h2 { font-size: 1.5rem; }
+.sos-modal p { color: var(--text); }
+.sos-phones {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+.sos-phones .phone-card { background: var(--danger-bg); box-shadow: none; }
+.sos-action {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.8rem 1rem;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border);
+  background: var(--bg-elevated);
+  transition: border-color 0.2s, background 0.2s;
+}
+.sos-action:hover { border-color: var(--accent); background: var(--accent-bg); }
+.sos-action strong { display: block; color: var(--text-h); }
+.sos-action small { color: var(--text-muted); font-size: 0.82rem; }
+button.sos-link { border: none; cursor: pointer; }
+.sos-modal { max-height: calc(100vh - 2rem); overflow-y: auto; }
+.sos-modal .row-between { flex-wrap: nowrap; align-items: flex-start; }
+
+/* Узкие телефоны: в шапке помещаются логотип, SOS, тема, вход и меню */
+@media (max-width: 420px) {
+  .header-container { gap: 0.4rem; padding-left: 0.75rem; padding-right: 0.75rem; }
+  .nav-actions { gap: 0.15rem; }
+  .logo { font-size: 1.15rem; gap: 0.45rem; }
+  .logo-mark { width: 32px; height: 32px; }
+  .icon-btn { width: 36px; height: 36px; }
+  .nav-actions .btn-sm { padding: 0.4rem 0.75rem; }
+}
