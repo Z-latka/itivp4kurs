@@ -1,5 +1,4 @@
 @baseUrl = http://localhost:3000/api
-# Токены берутся из ответов /auth/login (поле token)
 @userToken = <вставьте token клиента>
 @adminToken = <вставьте token администратора>
 @psyToken = <вставьте token психолога>
@@ -8,7 +7,7 @@
 @questionId = <_id обращения>
 @reviewId = <_id отзыва>
 
-### Регистрация клиента (роль всегда user)
+###
 POST {{baseUrl}}/auth/register
 Content-Type: application/json
 
@@ -18,7 +17,7 @@ Content-Type: application/json
   "nickname": "Тихий Лис"
 }
 
-### Вход клиента
+###
 POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
@@ -27,7 +26,7 @@ Content-Type: application/json
   "password": "Demo123!"
 }
 
-### Вход администратора (психолога), создаётся сидером
+###
 POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
@@ -36,7 +35,7 @@ Content-Type: application/json
   "password": "Admin123!"
 }
 
-### Вход психолога
+###
 POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
@@ -45,14 +44,14 @@ Content-Type: application/json
   "password": "Psy123!"
 }
 
-### Профиль без токена -> 401
+###
 GET {{baseUrl}}/auth/profile
 
-### Профиль
+###
 GET {{baseUrl}}/auth/profile
 Authorization: Bearer {{userToken}}
 
-### Смена псевдонима
+###
 PUT {{baseUrl}}/auth/profile
 Authorization: Bearer {{userToken}}
 Content-Type: application/json
@@ -61,7 +60,7 @@ Content-Type: application/json
   "nickname": "Ночная Сова"
 }
 
-### Неверный пароль
+###
 POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
@@ -70,13 +69,13 @@ Content-Type: application/json
   "password": "WrongPassword!"
 }
 
-### ===== Консультации =====
+###
 GET {{baseUrl}}/consultations
 
 ###
 GET {{baseUrl}}/consultations/{{consultationId}}
 
-### Создание (только admin)
+###
 POST {{baseUrl}}/consultations
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
@@ -89,7 +88,7 @@ Content-Type: application/json
   "psychologist": "<_id психолога из GET /psychologists>"
 }
 
-### Обновление (только admin)
+###
 PUT {{baseUrl}}/consultations/{{consultationId}}
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
@@ -101,11 +100,11 @@ Content-Type: application/json
   "status": "busy"
 }
 
-### Удаление (только admin)
+###
 DELETE {{baseUrl}}/consultations/{{consultationId}}
 Authorization: Bearer {{adminToken}}
 
-### Отзыв
+###
 POST {{baseUrl}}/consultations/{{consultationId}}/reviews
 Authorization: Bearer {{userToken}}
 Content-Type: application/json
@@ -115,7 +114,7 @@ Content-Type: application/json
   "comment": "Очень помогло"
 }
 
-### ===== Записи =====
+###
 POST {{baseUrl}}/bookings
 Authorization: Bearer {{userToken}}
 Content-Type: application/json
@@ -135,7 +134,7 @@ Authorization: Bearer {{userToken}}
 PATCH {{baseUrl}}/bookings/{{bookingId}}/cancel
 Authorization: Bearer {{userToken}}
 
-### Все записи (admin)
+###
 GET {{baseUrl}}/bookings
 Authorization: Bearer {{adminToken}}
 
@@ -148,13 +147,13 @@ Content-Type: application/json
   "status": "confirmed"
 }
 
-### ===== Тесты =====
+###
 GET {{baseUrl}}/tests
 
 ###
 GET {{baseUrl}}/tests/anxiety
 
-### Гость: результат без сохранения
+###
 POST {{baseUrl}}/tests/anxiety/submit
 Content-Type: application/json
 
@@ -162,7 +161,7 @@ Content-Type: application/json
   "answers": [1, 2, 1, 0, 1, 2, 1]
 }
 
-### Авторизованный: результат сохраняется
+###
 POST {{baseUrl}}/tests/anxiety/submit
 Authorization: Bearer {{userToken}}
 Content-Type: application/json
@@ -175,7 +174,7 @@ Content-Type: application/json
 GET {{baseUrl}}/tests/results/my
 Authorization: Bearer {{userToken}}
 
-### ===== Анонимные обращения =====
+###
 POST {{baseUrl}}/questions
 Authorization: Bearer {{userToken}}
 Content-Type: application/json
@@ -189,11 +188,11 @@ Content-Type: application/json
 GET {{baseUrl}}/questions/my
 Authorization: Bearer {{userToken}}
 
-### Психолог берёт обращение из очереди
+###
 POST {{baseUrl}}/questions/{{questionId}}/assign
 Authorization: Bearer {{psyToken}}
 
-### Ответ психолога
+###
 POST {{baseUrl}}/questions/{{questionId}}/messages
 Authorization: Bearer {{psyToken}}
 Content-Type: application/json
@@ -202,7 +201,7 @@ Content-Type: application/json
   "text": "Здравствуйте! Давайте разберёмся вместе."
 }
 
-### Очередь обращений (психолог)
+###
 GET {{baseUrl}}/questions?scope=queue
 Authorization: Bearer {{psyToken}}
 
@@ -213,8 +212,8 @@ Authorization: Bearer {{userToken}}
 ###
 GET {{baseUrl}}/stats
 
-### ===== MongoDB: вложенные массивы =====
-### Изменение элемента массива (позиционный $)
+###
+
 PATCH {{baseUrl}}/consultations/{{consultationId}}/reviews/{{reviewId}}
 Authorization: Bearer {{userToken}}
 Content-Type: application/json
@@ -223,7 +222,7 @@ Content-Type: application/json
   "rating": 4
 }
 
-### $addToSet тегов
+###
 POST {{baseUrl}}/consultations/{{consultationId}}/tags
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
@@ -232,19 +231,19 @@ Content-Type: application/json
   "tags": ["тревога", "экзамены"]
 }
 
-### Поиск по элементу массива
+###
 GET {{baseUrl}}/consultations?tag=тревога
 
-### Aggregation pipeline
+###
 GET {{baseUrl}}/consultations/stats/tags
 
-### ===== Роли =====
+###
 GET {{baseUrl}}/psychologists
 
-### Администратор: психологи
+###
 GET {{baseUrl}}/admin/psychologists
 Authorization: Bearer {{adminToken}}
 
-### Администратор: статистика
+###
 GET {{baseUrl}}/admin/stats
 Authorization: Bearer {{adminToken}}

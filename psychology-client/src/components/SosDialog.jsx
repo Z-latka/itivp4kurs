@@ -4,8 +4,6 @@ import { MessageCircle, Phone, Wind, X } from "lucide-react";
 import { navigate } from "../router";
 import { useAuth } from "../auth/context";
 
-// Экстренная помощь: открывается поверх любой страницы, без перехода.
-// Отличается от раздела «Самопомощь» — здесь только самое срочное
 export default function SosDialog({ open, onClose }) {
   const { user } = useAuth();
 
@@ -23,7 +21,6 @@ export default function SosDialog({ open, onClose }) {
     navigate(to);
   };
 
-  // Портал в body: у шапки есть backdrop-filter, внутри неё fixed-окно было бы обрезано
   return createPortal(
     <div className="modal-backdrop" onClick={onClose}>
       <div

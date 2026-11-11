@@ -1,18 +1,14 @@
-// Наполнение MongoDB демонстрационными данными: npm run seed
-// Флаг --reset очищает коллекции перед заполнением
 require("dotenv").config();
 const bcrypt = require("bcrypt");
 const mongoose = require("mongoose");
 const connectDB = require("../db");
 const { User, Consultation, Booking, Question } = require("../models");
 
-// Дата в формате ГГГГ-ММ-ДД по местному времени (toISOString дал бы UTC)
 const localDate = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 const DAY = 24 * 60 * 60 * 1000;
 
-// key — внутреннее имя для связи с каталогом ниже
 const ACCOUNTS = [
   {
     key: "admin",
@@ -156,7 +152,6 @@ const CATALOG = [
   },
 ];
 
-// Демо-отзывы других клиентов (у них нет аккаунтов — только id автора и псевдоним)
 const review = (nickname, rating, comment, daysAgo) => ({
   user: new mongoose.Types.ObjectId(),
   nickname,
@@ -197,7 +192,6 @@ const run = async () => {
     console.log("Коллекции очищены");
   }
 
-  // Создаём индексы, описанные в схемах (unique email, role, tags, profile.city …)
   await Promise.all([
     User.syncIndexes(),
     Consultation.syncIndexes(),
@@ -225,7 +219,6 @@ const run = async () => {
         reviews: REVIEWS[i] || [],
       })),
     );
-    // Отзыв демо-клиента — его можно отредактировать на сайте
     await Consultation.updateOne(
       { _id: created[0]._id },
       {
@@ -240,7 +233,6 @@ const run = async () => {
       },
     );
 
-    // Записи: время выбирается по часовым слотам
     await Booking.insertMany([
       {
         user: demo._id,
@@ -300,7 +292,6 @@ const run = async () => {
             answers: [1, 2, 1, 1, 2, 1, 1],
             takenAt: new Date(Date.now() - 7 * DAY),
           },
-          // Дневник настроения за последнюю неделю
           moods: {
             $each: [3, 2, 2, 3, 4, 3, 4].map((mood, i) => ({
               date: localDate(new Date(Date.now() - (6 - i) * DAY)),

@@ -50,8 +50,6 @@ const TABS = {
 const isUpcoming = (b) =>
   ["pending", "confirmed"].includes(b.status) && new Date(b.scheduledAt) > new Date();
 
-// ===== Записи =====
-
 function BookingRow({ booking, onCancel }) {
   const status = BOOKING_STATUS[booking.status] || BOOKING_STATUS.pending;
   const c = booking.consultation || {};
@@ -117,8 +115,6 @@ function BookingsTab({ bookings, onCancel }) {
     </div>
   );
 }
-
-// ===== Дневник настроения =====
 
 function MoodChart({ entries }) {
   const days = useMemo(() => {
@@ -321,8 +317,6 @@ function MoodTab() {
   );
 }
 
-// ===== Тесты =====
-
 function TestsTab({ results }) {
   const groups = useMemo(() => {
     const map = {};
@@ -378,8 +372,6 @@ function TestsTab({ results }) {
     </div>
   );
 }
-
-// ===== Настройки =====
 
 function SettingsTab() {
   const { user, setUser } = useAuth();
@@ -451,8 +443,6 @@ function SettingsTab() {
   );
 }
 
-// ===== Обзор =====
-
 function OverviewTab({ bookings, results }) {
   const next = bookings.filter(isUpcoming).sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt))[0];
   const lastTest = results[0];
@@ -514,7 +504,6 @@ function OverviewTab({ bookings, results }) {
 export default function ProfilePage({ query = {} }) {
   const { user } = useAuth();
   const toast = useToast();
-  // Сотрудникам в кабинете нужны только настройки аккаунта
   const tabs = user.role === "user" ? TABS : { settings: TABS.settings };
   const tab = tabs[query.tab] ? query.tab : Object.keys(tabs)[0];
   const [bookings, setBookings] = useState([]);

@@ -28,7 +28,6 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// Общая статистика сервиса
 app.get("/api/stats", async (req, res, next) => {
   try {
     const [users, psychologists, consultations, bookings, questions, openQuestions, tests] =
@@ -39,7 +38,6 @@ app.get("/api/stats", async (req, res, next) => {
         Booking.countDocuments(),
         Question.countDocuments(),
         Question.countDocuments({ status: "open" }),
-        // Сумма длин вложенных массивов testResults по всем пользователям
         User.aggregate([
           { $group: { _id: null, total: { $sum: { $size: "$testResults" } } } },
         ]),
@@ -75,14 +73,12 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  // Некорректный ObjectId в параметрах запроса
   if (err instanceof mongoose.Error.CastError) {
     return res.status(400).json({
       error: "Неверные данные запроса",
       message: `Некорректное значение поля ${err.path}: ${err.value}`,
     });
   }
-  // Нарушение правил схемы (required, min/max, enum, match)
   if (err instanceof mongoose.Error.ValidationError) {
     return res.status(400).json({
       error: "Ошибка валидации",
@@ -91,7 +87,6 @@ app.use((err, req, res, next) => {
         .join("; "),
     });
   }
-  // Дубликат уникального индекса
   if (err.code === 11000) {
     return res.status(409).json({
       error: "Конфликт данных",

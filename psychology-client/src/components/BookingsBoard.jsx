@@ -18,8 +18,6 @@ const dayTitle = (d) => {
   return date.toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" });
 };
 
-// Расписание записей по дням. Сервер сам отдаёт психологу только его записи,
-// администратору — все; showPsychologist добавляет имя специалиста в строку
 export default function BookingsBoard({ showPsychologist = false }) {
   const toast = useToast();
   const [bookings, setBookings] = useState([]);

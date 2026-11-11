@@ -1,4 +1,3 @@
-// Общие подписи, справочники и форматтеры интерфейса
 import {
   Activity,
   CloudRain,
@@ -33,12 +32,10 @@ export const FORMATS = {
   audio: { label: "Звонок", icon: Phone },
 };
 
-// Можно ли записаться на консультацию
 export const isBookable = (c) => !["busy", "completed"].includes(c.status);
 
 export const formatLabel = (format) => FORMATS[format]?.label || format;
 
-// Шкала настроения дневника: значение 1–5
 export const MOODS = [
   { value: 1, label: "Очень тяжело", icon: Frown, color: "#7b86b8" },
   { value: 2, label: "Плохо", icon: Annoyed, color: "#8e9ac4" },
@@ -49,7 +46,6 @@ export const MOODS = [
 
 export const moodOf = (value) => MOODS.find((m) => m.value === Math.round(value));
 
-// Иконки тестов по их id (данные тестов приходят с сервера)
 export const TEST_ICONS = {
   anxiety: Activity,
   depression: CloudRain,
@@ -74,7 +70,6 @@ export const formatTime = (value) =>
 export const formatPrice = (price) =>
   Number(price) > 0 ? `${Number(price)} BYN` : "Бесплатно";
 
-// ГГГГ-ММ-ДД по местному времени
 export const localDateKey = (date = new Date()) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
     date.getDate(),
@@ -89,7 +84,6 @@ export const initials = (name = "") =>
     .map((w) => w[0].toUpperCase())
     .join("") || "?";
 
-// "Анна Ковалёва, психолог-консультант" → { name, role }
 export const splitSpecialist = (specialist = "") => {
   const [name, ...rest] = specialist.split(",");
   return { name: name.trim(), role: rest.join(",").trim() };

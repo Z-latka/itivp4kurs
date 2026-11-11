@@ -208,7 +208,6 @@ function Thread({ id }) {
 
   useEffect(() => {
     load();
-    // Подгружаем новые сообщения, пока страница открыта
     const timer = setInterval(() => {
       if (document.visibilityState === "visible") load();
     }, POLL_MS);

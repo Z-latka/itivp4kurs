@@ -1,7 +1,6 @@
 import { useEffect, useReducer } from "react";
 import { Pause, Play } from "lucide-react";
 
-// Дыхание 4–4–6: вдох, пауза, медленный выдох. Длинный выдох успокаивает
 const PHASES = [
   { label: "Вдох", seconds: 4, scale: 1 },
   { label: "Задержка", seconds: 4, scale: 1 },

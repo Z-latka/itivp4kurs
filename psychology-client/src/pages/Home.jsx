@@ -166,7 +166,6 @@ export default function Home({ page }) {
   useEffect(() => {
     fetchConsultations()
       .then(({ data }) => {
-        // Сначала бесплатная первичная консультация, затем самые оценённые
         const sorted = [...data].sort(
           (a, b) => (a.price === 0 ? -1 : 0) - (b.price === 0 ? -1 : 0) || (b.rating || 0) - (a.rating || 0),
         );

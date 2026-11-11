@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 
-// Простой hash-роутер: #/page/param?key=value
 const parse = () => {
   const hash = window.location.hash.replace(/^#\/?/, "");
   const [path, search = ""] = hash.split("?");

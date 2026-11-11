@@ -4,7 +4,6 @@ import { fetchProfile } from "../api";
 
 export default function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  // Пока проверяем сохранённый токен, не показываем "гостевой" интерфейс
   const [checking, setChecking] = useState(() =>
     Boolean(localStorage.getItem("token")),
   );
@@ -40,7 +39,6 @@ export default function AuthProvider({ children }) {
       isAdmin: user?.role === "admin",
       isPsychologist: user?.role === "psychologist",
       isClient: user?.role === "user",
-      // Домашняя страница пользователя после входа зависит от роли
       homePage: user?.role === "admin" ? "admin" : user?.role === "psychologist" ? "work" : "profile",
       signIn,
       signOut,

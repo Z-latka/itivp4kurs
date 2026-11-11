@@ -34,7 +34,6 @@ import {
   splitSpecialist,
 } from "../labels";
 
-// Расписание: часовые слоты с 10:00 до 19:00, воскресенье — выходной
 const HOURS = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
 const DAYS_AHEAD = 14;
 
@@ -56,7 +55,6 @@ const slotDate = (day, hour) => {
   return d;
 };
 
-// Слот доступен, если до него больше часа
 const isTooSoon = (date) => date.getTime() < Date.now() + 60 * 60 * 1000;
 
 function CatalogList({ query }) {

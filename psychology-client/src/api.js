@@ -9,7 +9,6 @@ const api = axios.create({
   },
 });
 
-// Перехватчик запроса: подставляет JWT-токен из localStorage в каждый запрос
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
   if (token) {
@@ -18,7 +17,6 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Перехватчик ответа: при истёкшем токене разлогинивает пользователя
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -30,7 +28,6 @@ api.interceptors.response.use(
   },
 );
 
-// Единообразное извлечение текста ошибки для показа пользователю
 export const errorMessage = (err, fallback = "Ошибка при запросе к серверу") =>
   err.response
     ? err.response.data?.message || fallback

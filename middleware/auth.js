@@ -14,7 +14,6 @@ const authenticateToken = (req, res, next) => {
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
-      // 401, чтобы клиент понял, что нужно войти заново
       return res
         .status(401)
         .json({ message: "Недействительный или истекший токен." });
@@ -24,7 +23,6 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// Не требует входа, но если токен валиден — заполняет req.user
 const optionalAuth = (req, res, next) => {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
@@ -41,7 +39,6 @@ const ROLE_NAMES = {
   admin: "администраторам",
 };
 
-// Пропускает только пользователей с одной из перечисленных ролей
 const requireRole =
   (...roles) =>
   (req, res, next) => {
@@ -53,7 +50,6 @@ const requireRole =
 
 const isAdmin = requireRole("admin");
 const isPsychologist = requireRole("psychologist");
-// Сотрудники сервиса: психологи и администратор
 const isStaff = requireRole("psychologist", "admin");
 
 module.exports = {

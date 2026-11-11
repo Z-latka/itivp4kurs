@@ -7,7 +7,6 @@ const STATUSES = ["pending", "confirmed", "completed", "cancelled"];
 
 router.use(authenticateToken);
 
-// Консультация с именем психолога для ответа клиенту
 const populateConsultation = {
   path: "consultation",
   select: "-reviews",
@@ -20,16 +19,13 @@ const serialize = (booking) => {
     json.consultation = booking.consultation.toClient();
   }
   if (booking.user && booking.user.profile) {
-    // Сотрудник видит только псевдоним клиента — анонимность сохраняется
     json.user = { id: String(booking.user._id), nickname: booking.user.profile.nickname };
   }
   return json;
 };
 
-// Психолог работает только со своими записями, администратор — со всеми
 const staffFilter = (req) => (req.user.role === "admin" ? {} : { psychologist: req.user.id });
 
-// Запись на консультацию (только клиенты)
 router.post("/", async (req, res, next) => {
   try {
     if (req.user.role !== "user") {
@@ -56,8 +52,6 @@ router.post("/", async (req, res, next) => {
         .json({ message: "Нельзя записаться на прошедшее время" });
     }
 
-    // Время занято, если на него уже есть активная запись к этой консультации,
-    // к этому психологу или у этого же клиента в это время другая встреча
     const busyFor = [{ consultation: consultation._id }, { user: req.user.id }];
     if (consultation.psychologist) busyFor.push({ psychologist: consultation.psychologist });
     const conflict = await Booking.findOne({
@@ -88,7 +82,6 @@ router.post("/", async (req, res, next) => {
   }
 });
 
-// Мои записи: populate подставляет консультацию, а в ней — психолога (вложенный populate)
 router.get("/my", async (req, res, next) => {
   try {
     const bookings = await Booking.find({ user: req.user.id })
@@ -100,7 +93,6 @@ router.get("/my", async (req, res, next) => {
   }
 });
 
-// Отмена: клиентом — своей записи, психологом — записи к нему, администратором — любой
 router.patch("/:id/cancel", async (req, res, next) => {
   try {
     const booking = await Booking.findById(req.params.id);
@@ -125,7 +117,6 @@ router.patch("/:id/cancel", async (req, res, next) => {
   }
 });
 
-// Расписание сотрудника: ?status=pending
 router.get("/", isStaff, async (req, res, next) => {
   try {
     const filter = staffFilter(req);

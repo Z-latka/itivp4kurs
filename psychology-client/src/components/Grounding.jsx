@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { ArrowLeft, ArrowRight, RotateCcw } from "lucide-react";
 
-// Техника заземления 5-4-3-2-1: возвращает внимание в настоящий момент
 const STEPS = [
   { count: 5, sense: "вещей, которые вы видите", hint: "Назовите их про себя: лампа, окно, кружка…" },
   { count: 4, sense: "вещи, которые можно потрогать", hint: "Ткань одежды, поверхность стола, собственные ладони." },

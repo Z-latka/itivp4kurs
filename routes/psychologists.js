@@ -2,8 +2,6 @@ const express = require("express");
 const router = express.Router();
 const { User, Consultation } = require("../models");
 
-// Сводка по консультациям каждого психолога: aggregation pipeline
-// ($match → $group с подсчётом отзывов и средней оценки по вложенным массивам)
 const consultationStats = async (ids) => {
   const rows = await Consultation.aggregate([
     { $match: { psychologist: { $in: ids } } },
@@ -32,7 +30,6 @@ const consultationStats = async (ids) => {
   );
 };
 
-// Публичный список специалистов (только активные)
 router.get("/", async (req, res, next) => {
   try {
     const psychologists = await User.find({ role: "psychologist", active: true })
@@ -54,7 +51,6 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-// Профиль специалиста и его консультации
 router.get("/:id", async (req, res, next) => {
   try {
     const psychologist = await User.findOne({

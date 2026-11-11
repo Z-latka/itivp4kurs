@@ -13,7 +13,6 @@ const pickSpecialist = (body = {}) =>
     SPECIALIST_FIELDS.filter((f) => body[f] !== undefined).map((f) => [f, body[f]]),
   );
 
-// Администратор видит email психолога — он нужен для входа и связи
 const staffCard = (u) => ({
   id: u.id,
   email: u.email,
@@ -27,7 +26,6 @@ router.get("/psychologists", async (req, res, next) => {
     const list = await User.find({ role: "psychologist" })
       .select("email active specialist createdAt")
       .sort({ active: -1, "specialist.fullName": 1 });
-    // Сколько консультаций и предстоящих записей у каждого
     const [consultations, upcoming] = await Promise.all([
       Consultation.aggregate([{ $group: { _id: "$psychologist", count: { $sum: 1 } } }]),
       Booking.aggregate([
@@ -44,7 +42,6 @@ router.get("/psychologists", async (req, res, next) => {
   }
 });
 
-// Новый психолог: аккаунт создаёт только администратор
 router.post("/psychologists", async (req, res, next) => {
   try {
     const { email, password } = req.body;
@@ -68,8 +65,6 @@ router.post("/psychologists", async (req, res, next) => {
   }
 });
 
-// Изменение анкеты и включение/отключение психолога.
-// При отключении его консультации закрываются для записи, при включении — открываются
 router.patch("/psychologists/:id", async (req, res, next) => {
   try {
     const update = {};
@@ -98,13 +93,11 @@ router.patch("/psychologists/:id", async (req, res, next) => {
   }
 });
 
-// Статистика для администратора: несколько aggregation pipeline
 router.get("/stats", async (req, res, next) => {
   try {
     const [usersByRole, bookingsByStatus, popular, questionsByStatus, queue] = await Promise.all([
       User.aggregate([{ $group: { _id: "$role", count: { $sum: 1 } } }]),
       Booking.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
-      // Популярные консультации: группировка записей + $lookup (аналог JOIN)
       Booking.aggregate([
         { $match: { status: { $ne: "cancelled" } } },
         { $group: { _id: "$consultation", bookings: { $sum: 1 } } },

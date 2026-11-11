@@ -40,7 +40,6 @@ export default function AuthPage({ query = {} }) {
         mode === "login"
           ? await login({ email: form.email, password: form.password })
           : await register(form);
-      // JWT-токен сохраняется и затем подставляется перехватчиком axios
       signIn(data.token, data.user);
       toast(mode === "login" ? `С возвращением, ${data.user.nickname}!` : "Аккаунт создан");
       const home = { admin: "admin", psychologist: "work" }[data.user.role] || "profile";

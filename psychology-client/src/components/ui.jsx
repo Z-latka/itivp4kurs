@@ -93,7 +93,6 @@ export function MoodPicker({ value, onChange, size = 28 }) {
   );
 }
 
-// Мини-график динамики: значения в диапазоне [0, max]
 export function Sparkline({ values, max, width = 120, height = 36, color = "var(--accent)" }) {
   if (values.length < 2) return null;
   const step = width / (values.length - 1);

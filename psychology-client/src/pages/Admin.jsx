@@ -196,7 +196,7 @@ function PsychologistForm({ initial, onSaved, onCancel }) {
 function PsychologistsTab() {
   const toast = useToast();
   const [list, setList] = useState(null);
-  const [mode, setMode] = useState(null); // null | "new" | объект психолога
+  const [mode, setMode] = useState(null);
   const [toToggle, setToToggle] = useState(null);
 
   const load = useCallback(

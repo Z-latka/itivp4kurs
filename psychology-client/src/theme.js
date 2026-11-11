@@ -3,7 +3,15 @@ import { useCallback, useState } from "react";
 const current = () =>
   document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
 
-// Светлая/тёмная тема: атрибут data-theme на <html> + выбор в localStorage
+const remember = (theme) => {
+  try {
+    localStorage.setItem("theme", theme);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export function useTheme() {
   const [theme, setTheme] = useState(current);
 
@@ -14,11 +22,7 @@ export function useTheme() {
     } else {
       document.documentElement.removeAttribute("data-theme");
     }
-    try {
-      localStorage.setItem("theme", next);
-    } catch {
-      // хранилище недоступно — тема просто не запомнится
-    }
+    remember(next);
     setTheme(next);
   }, []);
 

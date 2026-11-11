@@ -8,7 +8,6 @@ router.get("/", (req, res) => {
   res.json(TESTS.map((t) => publicTest(t)));
 });
 
-// История результатов: вложенный массив testResults документа пользователя
 router.get("/results/my", authenticateToken, async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id).select("testResults");
@@ -27,8 +26,6 @@ router.get("/:id", (req, res) => {
   res.json(publicTest(test, true));
 });
 
-// Гость получает результат без сохранения, авторизованный —
-// результат добавляется ($push) в массив testResults его документа
 router.post("/:id/submit", optionalAuth, async (req, res, next) => {
   try {
     const test = findTest(req.params.id);

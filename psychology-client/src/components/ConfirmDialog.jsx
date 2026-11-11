@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 
-// Модальное окно подтверждения вместо системного window.confirm
 export default function ConfirmDialog({
   open,
   title,

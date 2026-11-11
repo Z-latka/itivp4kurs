@@ -12,7 +12,6 @@ export default function Header({ currentPage }) {
   const [open, setOpen] = useState(false);
   const [sosOpen, setSosOpen] = useState(false);
 
-  // Меню зависит от роли: сотрудникам — рабочие разделы, клиентам и гостям — сервисы
   const navLinks = isAdmin
     ? [
         { to: "admin", label: "Администрирование" },

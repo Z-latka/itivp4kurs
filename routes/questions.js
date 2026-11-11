@@ -5,7 +5,6 @@ const { authenticateToken, isPsychologist } = require("../middleware/auth");
 
 router.use(authenticateToken);
 
-// Автор виден психологу только по псевдониму, психолог клиенту — по имени
 const withPeople = (query) =>
   query.populate("user", "profile.nickname").populate("psychologist", "specialist.fullName specialist.title");
 
@@ -29,7 +28,6 @@ const loadAccessible = async (req, res) => {
   return question;
 };
 
-// Новое обращение: первое сообщение сразу кладётся во вложенный массив
 router.post("/", async (req, res, next) => {
   try {
     if (req.user.role !== "user") {
@@ -62,8 +60,6 @@ router.get("/my", async (req, res, next) => {
   }
 });
 
-// Обращения для психолога: ?scope=queue — общая очередь (никто не взял),
-// ?scope=mine — взятые мной, без параметра — и те и другие
 router.get("/", isPsychologist, async (req, res, next) => {
   try {
     const queue = { psychologist: null, status: { $ne: "closed" } };
@@ -86,8 +82,6 @@ router.get("/:id", async (req, res, next) => {
   }
 });
 
-// Взять обращение в работу. Условие psychologist: null делает операцию атомарной:
-// если двое психологов нажмут одновременно, обращение достанется только одному
 router.post("/:id/assign", isPsychologist, async (req, res, next) => {
   try {
     const question = await withPeople(
@@ -106,8 +100,6 @@ router.post("/:id/assign", isPsychologist, async (req, res, next) => {
   }
 });
 
-// Новое сообщение: $push в массив messages и смена статуса одной операцией.
-// Если психолог отвечает на обращение из очереди — оно закрепляется за ним
 router.post("/:id/messages", async (req, res, next) => {
   try {
     const question = await loadAccessible(req, res);
@@ -156,7 +148,6 @@ router.patch("/:id/close", async (req, res, next) => {
   }
 });
 
-// Удаление обращения автором: переписка удаляется вместе с документом
 router.delete("/:id", async (req, res, next) => {
   try {
     const question = await loadAccessible(req, res);

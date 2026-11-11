@@ -25,7 +25,6 @@ function TestsList() {
     if (!user) return;
     fetchMyResults()
       .then(({ data }) => {
-        // Последний результат по каждому тесту (результаты отсортированы от новых к старым)
         const map = {};
         data.forEach((r) => {
           if (!map[r.testId]) map[r.testId] = r;
@@ -199,7 +198,6 @@ function TestRunner({ id }) {
     [answers, isLast, sending, step, test],
   );
 
-  // Ответ цифрами 1–4 с клавиатуры, Backspace — назад
   useEffect(() => {
     if (!test || result) return undefined;
     const onKey = (e) => {

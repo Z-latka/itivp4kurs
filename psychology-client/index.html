@@ -17,7 +17,6 @@
     />
     <title>MindCare — психологическая поддержка</title>
     <script>
-      // Тема применяется до отрисовки, чтобы не было вспышки светлой темы
       try {
         var saved = localStorage.getItem("theme");
         var dark = saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;

@@ -30,7 +30,6 @@ router.post("/register", async (req, res, next) => {
         .json({ message: "Пользователь с таким email уже существует" });
     }
 
-    // Роль при регистрации всегда "user": администраторы создаются скриптом seed
     const newUser = await User.create({
       email,
       passwordHash: await bcrypt.hash(password, 10),
@@ -80,7 +79,6 @@ router.post("/login", async (req, res, next) => {
 
 router.get("/profile", authenticateToken, async (req, res, next) => {
   try {
-    // Проекция: историю тестов и дневник не загружаем
     const user = await User.findById(req.user.id).select("-testResults -moods");
     if (!user) {
       return res.status(404).json({ message: "Пользователь не найден" });
@@ -103,13 +101,11 @@ router.put("/profile", authenticateToken, async (req, res, next) => {
       if (!nickname.trim()) {
         return res.status(400).json({ message: "Псевдоним не может быть пустым" });
       }
-      // Обновление поля вложенного документа
       user.profile.nickname = nickname.trim();
     }
     if (city !== undefined) user.profile.city = city;
     if (about !== undefined) user.profile.about = about;
 
-    // Психолог сам редактирует свою публичную анкету (кроме имени — его меняет администратор)
     if (user.role === "psychologist" && req.body.specialist) {
       ["title", "experienceYears", "education", "approach", "about", "topics"].forEach((field) => {
         if (req.body.specialist[field] !== undefined) {

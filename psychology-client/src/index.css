@@ -1,8 +1,3 @@
-/* ==========================================================================
-   MindCare — дизайн-система
-   Спокойная природная палитра, светлая и тёмная темы на CSS-переменных
-   ========================================================================== */
-
 :root {
   --bg: #f6f4ef;
   --bg-card: #ffffff;
@@ -156,7 +151,6 @@ svg {
   flex-shrink: 0;
 }
 
-/* ===== Layout ===== */
 .container {
   width: 100%;
   max-width: 1140px;
@@ -259,7 +253,6 @@ svg {
   white-space: nowrap;
 }
 
-/* ===== Buttons ===== */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -354,7 +347,6 @@ svg {
   color: var(--text-h);
 }
 
-/* ===== Cards ===== */
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -392,7 +384,6 @@ svg {
 .icon-tile.lavender { background: var(--lavender-bg); color: var(--lavender); }
 .icon-tile.sm { width: 38px; height: 38px; border-radius: 11px; margin: 0; }
 
-/* ===== Forms ===== */
 .form-group {
   margin-bottom: 1rem;
 }
@@ -485,7 +476,6 @@ textarea { resize: vertical; }
   accent-color: var(--accent);
 }
 
-/* Сегментированный переключатель */
 .segmented {
   display: inline-flex;
   background: var(--bg-alt);
@@ -510,7 +500,6 @@ textarea { resize: vertical; }
   box-shadow: var(--shadow-sm);
 }
 
-/* ===== Chips, badges ===== */
 .chips {
   display: flex;
   flex-wrap: wrap;
@@ -550,7 +539,6 @@ button.chip.active {
   white-space: nowrap;
 }
 
-/* ===== Alerts & states ===== */
 .alert {
   padding: 0.85rem 1.1rem;
   border-radius: var(--radius-sm);
@@ -605,7 +593,6 @@ button.chip.active {
 .empty-state h3 { margin-bottom: 0.35rem; }
 .empty-state p { max-width: 420px; margin: 0 auto 1.25rem; }
 
-/* ===== Header ===== */
 .header {
   position: sticky;
   top: 0;
@@ -735,7 +722,6 @@ button.chip.active {
   .hide-mobile { display: none !important; }
 }
 
-/* ===== Footer ===== */
 .app-footer {
   border-top: 1px solid var(--border);
   background: var(--bg-card);
@@ -781,7 +767,6 @@ button.chip.active {
   .footer-grid > :first-child { grid-column: 1 / -1; }
 }
 
-/* ===== Page header ===== */
 .page-header {
   display: flex;
   justify-content: space-between;
@@ -811,7 +796,6 @@ button.chip.active {
 }
 .back-link:hover { color: var(--accent); }
 
-/* ===== Home ===== */
 .hero {
   display: grid;
   grid-template-columns: 1.15fr 1fr;
@@ -1008,7 +992,6 @@ button.chip.active {
   .hero { grid-template-columns: 1fr; gap: 2rem; padding-top: 1rem; }
 }
 
-/* ===== Stats ===== */
 .stats-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -1037,7 +1020,6 @@ button.chip.active {
   color: var(--text-muted);
 }
 
-/* ===== Catalog ===== */
 .filters {
   display: flex;
   flex-direction: column;
@@ -1256,7 +1238,6 @@ button.chip.active {
 .rating-input button.on { color: #e3a33b; }
 .rating-input button:hover { transform: scale(1.12); }
 
-/* ===== Lists ===== */
 .list {
   list-style: none;
   padding: 0;
@@ -1317,7 +1298,6 @@ button.chip.active {
   .list-row-side { justify-content: flex-start; width: 100%; }
 }
 
-/* ===== Tabs ===== */
 .tabs {
   display: flex;
   gap: 0.25rem;
@@ -1348,7 +1328,6 @@ button.chip.active {
   padding: 0.05rem 0.45rem;
 }
 
-/* ===== Tests ===== */
 .test-card {
   display: flex;
   flex-direction: column;
@@ -1453,7 +1432,6 @@ button.chip.active {
 
 .sparkline { display: block; }
 
-/* ===== Crisis ===== */
 .crisis-note {
   display: flex;
   gap: 1rem;
@@ -1508,7 +1486,6 @@ button.chip.active {
   .emergency { grid-template-columns: 1fr; }
 }
 
-/* ===== Breathing ===== */
 .breathing {
   display: flex;
   flex-direction: column;
@@ -1548,7 +1525,6 @@ button.chip.active {
 .breath-label small { display: block; font-weight: 600; opacity: 0.85; font-size: 0.8rem; }
 .breath-small .breath-stage { width: 160px; height: 160px; }
 
-/* ===== Grounding ===== */
 .grounding-step {
   display: flex;
   gap: 1rem;
@@ -1575,7 +1551,6 @@ button.chip.active {
 }
 .dots span.on { background: var(--accent); width: 22px; }
 
-/* ===== Questions / chat ===== */
 .thread {
   display: flex;
   flex-direction: column;
@@ -1657,7 +1632,6 @@ button.chip.active {
   .message { max-width: 90%; }
 }
 
-/* ===== Mood diary ===== */
 .mood-chart {
   display: flex;
   align-items: flex-end;
@@ -1688,7 +1662,6 @@ button.chip.active {
 }
 .feeling-tag { font-size: 0.78rem; }
 
-/* ===== Auth ===== */
 .auth-layout {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1734,7 +1707,6 @@ button.chip.active {
   .auth-main { padding: 2rem 1.5rem; }
 }
 
-/* ===== Modal ===== */
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -1756,7 +1728,6 @@ button.chip.active {
 .modal p { color: var(--text-muted); }
 .modal .form-actions { justify-content: flex-end; margin-top: 1.25rem; }
 
-/* ===== Toasts ===== */
 .toasts {
   position: fixed;
   right: 1.25rem;
@@ -1790,7 +1761,6 @@ button.chip.active {
   to { opacity: 1; transform: none; }
 }
 
-/* ===== Admin: компонент управления каталогом (ЛР5) ===== */
 .add-form { margin-bottom: 2rem; }
 .add-form h3 { margin-bottom: 1rem; }
 .consultations-list { margin-top: 1rem; }
@@ -1806,14 +1776,12 @@ button.chip.active {
   .mood-option { font-size: 0.66rem; padding: 0.6rem 0.1rem; }
 }
 
-/* Карточки статистики без иконки (компонент ЛР5) */
 .stat-card:not(:has(.icon-tile)) {
   flex-direction: column;
   align-items: flex-start;
   gap: 0.1rem;
 }
 
-/* Шапка на средних экранах: SOS и имя пользователя сжимаются до иконок */
 @media (max-width: 1400px) {
   .sos-text,
   .chip-name {
@@ -1828,7 +1796,6 @@ button.chip.active {
   flex-wrap: nowrap;
 }
 
-/* ===== Специалисты ===== */
 .specialist-card { display: flex; flex-direction: column; }
 .specialist-card .card-description { flex: 1; }
 .avatar.xl { width: 72px; height: 72px; font-size: 1.5rem; border-radius: 22px; }
@@ -1838,7 +1805,6 @@ button.chip.active {
 .bar-row .bar div { height: 100%; border-radius: 999px; background: var(--accent); }
 .staff-row.inactive { opacity: 0.6; }
 
-/* ===== Окно экстренной помощи ===== */
 .sos-modal { max-width: 480px; }
 .sos-modal h2 { font-size: 1.5rem; }
 .sos-modal p { color: var(--text); }
@@ -1868,7 +1834,6 @@ button.sos-link { border: none; cursor: pointer; }
 .sos-modal { max-height: calc(100vh - 2rem); overflow-y: auto; }
 .sos-modal .row-between { flex-wrap: nowrap; align-items: flex-start; }
 
-/* Узкие телефоны: в шапке помещаются логотип, SOS, тема, вход и меню */
 @media (max-width: 420px) {
   .header-container { gap: 0.4rem; padding-left: 0.75rem; padding-right: 0.75rem; }
   .nav-actions { gap: 0.15rem; }

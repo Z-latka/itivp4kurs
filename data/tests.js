@@ -1,7 +1,3 @@
-// Банк психологических тестов.
-// Каждый вариант ответа даёт баллы, сумма сравнивается с порогами уровней.
-// Тесты носят скрининговый характер и не являются диагнозом.
-
 const FREQUENCY_OPTIONS = [
   { label: "Ни разу", value: 0 },
   { label: "Несколько дней", value: 1 },
@@ -84,7 +80,6 @@ const TESTS = [
       "У меня появлялись мысли, что лучше было бы умереть, или мысли причинить себе вред",
     ],
     options: FREQUENCY_OPTIONS,
-    // Индекс вопроса, ненулевой ответ на который требует показать контакты экстренной помощи
     crisisQuestion: 8,
     levels: [
       {
@@ -219,7 +214,6 @@ const publicTest = (test, withQuestions = false) => {
 
 const findTest = (id) => TESTS.find((t) => t.id === id);
 
-// Подсчёт результата: answers — массив значений по порядку вопросов
 const scoreTest = (test, answers) => {
   if (!Array.isArray(answers) || answers.length !== test.questions.length) {
     return { error: `Нужно ответить на все ${test.questions.length} вопросов` };

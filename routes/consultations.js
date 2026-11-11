@@ -19,12 +19,9 @@ const notFound = (res, id) =>
 const withPsychologist = (query) =>
   query.populate("psychologist", Consultation.PSYCHOLOGIST_FIELDS);
 
-// Психолог управляет только своими консультациями, администратор — всеми
 const ownFilter = (req, id) =>
   req.user.role === "admin" ? { _id: id } : { _id: id, psychologist: req.user.id };
 
-// Данные для записи: психолог всегда назначает консультацию себе,
-// администратор может указать любого активного психолога
 const prepareData = async (req, res) => {
   const data = pick(req.body);
   if (req.user.role === "psychologist") {
@@ -39,9 +36,6 @@ const prepareData = async (req, res) => {
   return data;
 };
 
-// GET /consultations → Model.find()
-// Фильтры: ?tag=тревога (поиск по элементу массива), ?search=текст, ?maxPrice=100,
-// ?psychologist=<id> — консультации конкретного специалиста
 router.get("/", async (req, res, next) => {
   try {
     const filter = {};
@@ -56,7 +50,6 @@ router.get("/", async (req, res, next) => {
     }
 
     const consultations = await withPsychologist(Consultation.find(filter).sort({ createdAt: 1 }));
-    // В списке отдаём рейтинг и число отзывов, без самих отзывов
     res.json(
       consultations.map((c) => {
         const json = c.toClient();
@@ -69,7 +62,6 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-// Aggregation pipeline: популярность тегов и средний рейтинг по каждому тегу
 router.get("/stats/tags", async (req, res, next) => {
   try {
     const stats = await Consultation.aggregate([
@@ -101,7 +93,6 @@ router.get("/stats/tags", async (req, res, next) => {
   }
 });
 
-// Последние отзывы по всем консультациям (для главной страницы)
 router.get("/reviews/latest", async (req, res, next) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 3, 12);
@@ -129,7 +120,6 @@ router.get("/reviews/latest", async (req, res, next) => {
   }
 });
 
-// Занятое время в диапазоне дат: клиент показывает только свободные слоты
 router.get("/:id/slots", async (req, res, next) => {
   try {
     const from = new Date(req.query.from || Date.now());
@@ -139,7 +129,6 @@ router.get("/:id/slots", async (req, res, next) => {
     }
     const consultation = await Consultation.findById(req.params.id).select("psychologist");
     if (!consultation) return notFound(res, req.params.id);
-    // Занятым считается время записей к этой консультации и к этому психологу
     const owners = [{ consultation: consultation._id }];
     if (consultation.psychologist) owners.push({ psychologist: consultation.psychologist });
     const busy = await Booking.find({
@@ -153,7 +142,6 @@ router.get("/:id/slots", async (req, res, next) => {
   }
 });
 
-// GET /consultations/:id → Model.findById(id)
 router.get("/:id", async (req, res, next) => {
   try {
     const consultation = await withPsychologist(Consultation.findById(req.params.id));
@@ -166,7 +154,6 @@ router.get("/:id", async (req, res, next) => {
   }
 });
 
-// POST /consultations → Model.create(body)
 router.post("/", authenticateToken, isStaff, async (req, res, next) => {
   try {
     const data = await prepareData(req, res);
@@ -179,9 +166,6 @@ router.post("/", authenticateToken, isStaff, async (req, res, next) => {
   }
 });
 
-// PUT /consultations/:id → Model.findByIdAndUpdate(id, body, { new: true })
-// (в Mongoose 9 опция new устарела, её эквивалент — returnDocument: "after").
-// Психологу доступны только свои консультации — для него условие дополняется полем psychologist
 router.put("/:id", authenticateToken, isStaff, async (req, res, next) => {
   try {
     const data = await prepareData(req, res);
@@ -199,8 +183,6 @@ router.put("/:id", authenticateToken, isStaff, async (req, res, next) => {
   }
 });
 
-// DELETE /consultations/:id → Model.findByIdAndDelete(id)
-// Возвращает удалённый документ; связанные записи удаляются хуком (каскад)
 router.delete("/:id", authenticateToken, isStaff, async (req, res, next) => {
   try {
     const consultation =
@@ -217,10 +199,6 @@ router.delete("/:id", authenticateToken, isStaff, async (req, res, next) => {
   }
 });
 
-// ===== Вложенный массив reviews =====
-
-// Добавление отзыва: $push во вложенный массив.
-// Один отзыв на пользователя: условие "reviews.user": { $ne } не даёт добавить второй
 router.post("/:id/reviews", authenticateToken, async (req, res, next) => {
   try {
     if (req.user.role !== "user") {
@@ -252,8 +230,6 @@ router.post("/:id/reviews", authenticateToken, async (req, res, next) => {
   }
 });
 
-// Изменение элемента массива по месту: позиционный оператор $
-// Автор может менять свой отзыв, психолог (admin) — любой
 router.patch("/:id/reviews/:reviewId", authenticateToken, async (req, res, next) => {
   try {
     const match = { _id: req.params.reviewId };
@@ -277,7 +253,6 @@ router.patch("/:id/reviews/:reviewId", authenticateToken, async (req, res, next)
   }
 });
 
-// Удаление элемента массива: $pull
 router.delete("/:id/reviews/:reviewId", authenticateToken, async (req, res, next) => {
   try {
     const match = { _id: req.params.reviewId };
@@ -297,9 +272,6 @@ router.delete("/:id/reviews/:reviewId", authenticateToken, async (req, res, next
   }
 });
 
-// ===== Массив строк tags =====
-
-// $addToSet добавляет теги без дубликатов
 router.post("/:id/tags", authenticateToken, isStaff, async (req, res, next) => {
   try {
     const tags = [].concat(req.body.tags || req.body.tag || []).map(String);

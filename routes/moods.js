@@ -25,7 +25,6 @@ router.get("/feelings", (req, res) => {
   res.json(FEELINGS);
 });
 
-// Записи за последние N дней (по умолчанию 30) и сводка через aggregation pipeline
 router.get("/", async (req, res, next) => {
   try {
     const days = Math.min(Number(req.query.days) || 30, 365);
@@ -76,8 +75,6 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-// Запись за день: если на эту дату уже есть отметка — она обновляется по месту
-// (позиционный оператор $), иначе новая запись добавляется в массив ($push)
 router.post("/", async (req, res, next) => {
   try {
     const date = req.body.date || new Date().toISOString().slice(0, 10);

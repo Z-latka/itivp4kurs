@@ -8,7 +8,6 @@ import {
 import { CircleAlert, CircleCheck, Clock, Inbox, Plus, Wallet, X } from "lucide-react";
 import { formatPrice } from "../labels";
 
-// Теги вводятся через запятую: "тревога, стресс" → ["тревога", "стресс"]
 const parseTags = (value) =>
   [...new Set(value.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean))];
 
@@ -54,8 +53,6 @@ const STATUS_COLORS = {
   busy: "#c62828",
 };
 
-// psychologists — список психологов для выбора (режим администратора);
-// ownerId — показывать и создавать только консультации этого психолога
 export default function ConsultationsPage({ psychologists = null, ownerId = null }) {
   const specialistName = (id) => {
     const p = psychologists?.find((x) => x.id === id);
