@@ -78,6 +78,20 @@ npm run dev               # http://localhost:3000/api
 | `JWT_SECRET` | Длинная случайная строка для подписи токенов |
 | `JWT_EXPIRES_IN` | Срок действия токена, например `12h` |
 
+Если сеть (VPN, прокси, корпоративная сеть) блокирует DNS-запросы и подключение
+к Atlas падает с ошибкой `querySrv EREFUSED` или `queryTxt EREFUSED`, используйте
+стандартную строку подключения вместо `mongodb+srv://` — в ней адреса узлов кластера
+указаны явно, и особые DNS-запросы не нужны:
+
+```
+MONGO_URI=mongodb://<user>:<password>@<узел-00>:27017,<узел-01>:27017,<узел-02>:27017/?tls=true&replicaSet=<имя-набора-реплик>&authSource=admin&retryWrites=true&w=majority
+```
+
+Адреса узлов и имя набора реплик видны в Atlas: *Database → Clusters → Cluster0 → Overview*
+(раздел с узлами кластера), либо их можно получить запросами
+`https://dns.google/resolve?name=_mongodb._tcp.<кластер>.mongodb.net&type=SRV` и
+`https://dns.google/resolve?name=<кластер>.mongodb.net&type=TXT`.
+
 ### 3. Клиент
 
 ```bash
