@@ -1,32 +1,11 @@
 @baseUrl = http://localhost:3000/api
-@userToken = <вставьте token клиента>
-@adminToken = <вставьте token администратора>
-@psyToken = <вставьте token психолога>
-@consultationId = <_id консультации из GET /consultations>
-@bookingId = <_id записи>
-@questionId = <_id обращения>
-@reviewId = <_id отзыва>
+@admin = {{loginAdmin.response.body.$.token}}
+@client = {{loginClient.response.body.$.token}}
+@psy = {{loginPsy.response.body.$.token}}
+@consultationId = {{created.response.body.$.id}}
 
 ###
-POST {{baseUrl}}/auth/register
-Content-Type: application/json
-
-{
-  "email": "user1@example.com",
-  "password": "Password123!",
-  "nickname": "Тихий Лис"
-}
-
-###
-POST {{baseUrl}}/auth/login
-Content-Type: application/json
-
-{
-  "email": "demo@mindcare.by",
-  "password": "Demo123!"
-}
-
-###
+# @name loginAdmin
 POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
@@ -36,6 +15,17 @@ Content-Type: application/json
 }
 
 ###
+# @name loginClient
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "demo@mindcare.by",
+  "password": "Demo123!"
+}
+
+###
+# @name loginPsy
 POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
@@ -46,190 +36,96 @@ Content-Type: application/json
 
 ###
 GET {{baseUrl}}/auth/profile
-
-###
-GET {{baseUrl}}/auth/profile
-Authorization: Bearer {{userToken}}
-
-###
-PUT {{baseUrl}}/auth/profile
-Authorization: Bearer {{userToken}}
-Content-Type: application/json
-
-{
-  "nickname": "Ночная Сова"
-}
-
-###
-POST {{baseUrl}}/auth/login
-Content-Type: application/json
-
-{
-  "email": "user1@example.com",
-  "password": "WrongPassword!"
-}
+Authorization: Bearer {{client}}
 
 ###
 GET {{baseUrl}}/consultations
 
 ###
+# @name created
+POST {{baseUrl}}/consultations
+Authorization: Bearer {{admin}}
+Content-Type: application/json
+
+{
+  "topic": "Работа со страхом публичных выступлений",
+  "description": "Техники снижения тревоги перед выступлением и экзаменом.",
+  "duration": 60,
+  "price": 90,
+  "psychologist": "{{loginPsy.response.body.$.user.id}}",
+  "tags": ["тревога", "страх"]
+}
+
+###
 GET {{baseUrl}}/consultations/{{consultationId}}
 
 ###
-POST {{baseUrl}}/consultations
-Authorization: Bearer {{adminToken}}
-Content-Type: application/json
-
-{
-  "topic": "Депрессия",
-  "description": "Работа с депрессивными состояниями",
-  "duration": 90,
-  "price": 120,
-  "psychologist": "<_id психолога из GET /psychologists>"
-}
-
-###
 PUT {{baseUrl}}/consultations/{{consultationId}}
-Authorization: Bearer {{adminToken}}
+Authorization: Bearer {{admin}}
 Content-Type: application/json
 
 {
-  "topic": "Тревожность (обновлено)",
-  "description": "Новое описание: углубленная работа",
+  "price": 100,
   "duration": 75,
-  "status": "busy"
+  "status": "available"
 }
 
 ###
-DELETE {{baseUrl}}/consultations/{{consultationId}}
-Authorization: Bearer {{adminToken}}
+POST {{baseUrl}}/consultations
+Authorization: Bearer {{admin}}
+Content-Type: application/json
+
+{
+  "topic": "Без описания"
+}
 
 ###
+GET {{baseUrl}}/consultations/123
+
+###
+POST {{baseUrl}}/consultations
+Authorization: Bearer {{client}}
+Content-Type: application/json
+
+{
+  "topic": "Попытка клиента",
+  "description": "Клиент не может создавать консультации",
+  "duration": 30
+}
+
+###
+# @name review
 POST {{baseUrl}}/consultations/{{consultationId}}/reviews
-Authorization: Bearer {{userToken}}
+Authorization: Bearer {{client}}
+Content-Type: application/json
+
+{
+  "rating": 4,
+  "comment": "Полезные упражнения"
+}
+
+###
+PATCH {{baseUrl}}/consultations/{{consultationId}}/reviews/{{review.response.body.$.id}}
+Authorization: Bearer {{client}}
 Content-Type: application/json
 
 {
   "rating": 5,
-  "comment": "Очень помогло"
-}
-
-###
-POST {{baseUrl}}/bookings
-Authorization: Bearer {{userToken}}
-Content-Type: application/json
-
-{
-  "consultationId": "{{consultationId}}",
-  "scheduledAt": "2027-01-15T10:00:00Z",
-  "format": "video",
-  "comment": "Хочу разобраться с тревогой"
-}
-
-###
-GET {{baseUrl}}/bookings/my
-Authorization: Bearer {{userToken}}
-
-###
-PATCH {{baseUrl}}/bookings/{{bookingId}}/cancel
-Authorization: Bearer {{userToken}}
-
-###
-GET {{baseUrl}}/bookings
-Authorization: Bearer {{adminToken}}
-
-###
-PATCH {{baseUrl}}/bookings/{{bookingId}}/status
-Authorization: Bearer {{adminToken}}
-Content-Type: application/json
-
-{
-  "status": "confirmed"
-}
-
-###
-GET {{baseUrl}}/tests
-
-###
-GET {{baseUrl}}/tests/anxiety
-
-###
-POST {{baseUrl}}/tests/anxiety/submit
-Content-Type: application/json
-
-{
-  "answers": [1, 2, 1, 0, 1, 2, 1]
-}
-
-###
-POST {{baseUrl}}/tests/anxiety/submit
-Authorization: Bearer {{userToken}}
-Content-Type: application/json
-
-{
-  "answers": [1, 2, 1, 0, 1, 2, 1]
-}
-
-###
-GET {{baseUrl}}/tests/results/my
-Authorization: Bearer {{userToken}}
-
-###
-POST {{baseUrl}}/questions
-Authorization: Bearer {{userToken}}
-Content-Type: application/json
-
-{
-  "topic": "Не могу уснуть",
-  "text": "Уже неделю сплю по 4 часа, мысли не дают покоя"
-}
-
-###
-GET {{baseUrl}}/questions/my
-Authorization: Bearer {{userToken}}
-
-###
-POST {{baseUrl}}/questions/{{questionId}}/assign
-Authorization: Bearer {{psyToken}}
-
-###
-POST {{baseUrl}}/questions/{{questionId}}/messages
-Authorization: Bearer {{psyToken}}
-Content-Type: application/json
-
-{
-  "text": "Здравствуйте! Давайте разберёмся вместе."
-}
-
-###
-GET {{baseUrl}}/questions?scope=queue
-Authorization: Bearer {{psyToken}}
-
-###
-PATCH {{baseUrl}}/questions/{{questionId}}/close
-Authorization: Bearer {{userToken}}
-
-###
-GET {{baseUrl}}/stats
-
-###
-
-PATCH {{baseUrl}}/consultations/{{consultationId}}/reviews/{{reviewId}}
-Authorization: Bearer {{userToken}}
-Content-Type: application/json
-
-{
-  "rating": 4
+  "comment": "После второй встречи стало намного легче"
 }
 
 ###
 POST {{baseUrl}}/consultations/{{consultationId}}/tags
-Authorization: Bearer {{adminToken}}
+Authorization: Bearer {{admin}}
 Content-Type: application/json
 
 {
-  "tags": ["тревога", "экзамены"]
+  "tags": ["экзамены", "тревога"]
 }
+
+###
+DELETE {{baseUrl}}/consultations/{{consultationId}}/tags/страх
+Authorization: Bearer {{admin}}
 
 ###
 GET {{baseUrl}}/consultations?tag=тревога
@@ -241,9 +137,138 @@ GET {{baseUrl}}/consultations/stats/tags
 GET {{baseUrl}}/psychologists
 
 ###
+GET {{baseUrl}}/psychologists/{{loginPsy.response.body.$.user.id}}
+
+###
+# @name booking
+POST {{baseUrl}}/bookings
+Authorization: Bearer {{client}}
+Content-Type: application/json
+
+{
+  "consultationId": "{{consultationId}}",
+  "scheduledAt": "2027-02-01T10:00:00.000Z",
+  "format": "video",
+  "comment": "Выступление на защите диплома"
+}
+
+###
+GET {{baseUrl}}/bookings/my
+Authorization: Bearer {{client}}
+
+###
+GET {{baseUrl}}/bookings
+Authorization: Bearer {{psy}}
+
+###
+PATCH {{baseUrl}}/bookings/{{booking.response.body.$.id}}/status
+Authorization: Bearer {{psy}}
+Content-Type: application/json
+
+{
+  "status": "confirmed"
+}
+
+###
+GET {{baseUrl}}/tests
+
+###
+POST {{baseUrl}}/tests/anxiety/submit
+Authorization: Bearer {{client}}
+Content-Type: application/json
+
+{
+  "answers": [1, 2, 1, 0, 1, 2, 1]
+}
+
+###
+GET {{baseUrl}}/tests/results/my
+Authorization: Bearer {{client}}
+
+###
+# @name mood
+POST {{baseUrl}}/moods
+Authorization: Bearer {{client}}
+Content-Type: application/json
+
+{
+  "date": "2027-01-01",
+  "mood": 2,
+  "feelings": ["тревога", "усталость"],
+  "note": "Тяжёлый день"
+}
+
+###
+POST {{baseUrl}}/moods
+Authorization: Bearer {{client}}
+Content-Type: application/json
+
+{
+  "date": "2027-01-01",
+  "mood": 4,
+  "feelings": ["спокойствие"],
+  "note": "Вечером стало лучше"
+}
+
+###
+GET {{baseUrl}}/moods?days=3650
+Authorization: Bearer {{client}}
+
+###
+DELETE {{baseUrl}}/moods/{{mood.response.body.$.id}}
+Authorization: Bearer {{client}}
+
+###
+# @name question
+POST {{baseUrl}}/questions
+Authorization: Bearer {{client}}
+Content-Type: application/json
+
+{
+  "topic": "Страх выступлений",
+  "text": "Перед защитой диплома не могу собраться"
+}
+
+###
+GET {{baseUrl}}/questions?scope=queue
+Authorization: Bearer {{psy}}
+
+###
+POST {{baseUrl}}/questions/{{question.response.body.$.id}}/assign
+Authorization: Bearer {{psy}}
+
+###
+POST {{baseUrl}}/questions/{{question.response.body.$.id}}/messages
+Authorization: Bearer {{psy}}
+Content-Type: application/json
+
+{
+  "text": "Здравствуйте! Давайте начнём с дыхательного упражнения."
+}
+
+###
+GET {{baseUrl}}/questions/{{question.response.body.$.id}}
+Authorization: Bearer {{client}}
+
+###
+GET {{baseUrl}}/questions/{{question.response.body.$.id}}
+Authorization: Bearer {{admin}}
+
+###
 GET {{baseUrl}}/admin/psychologists
-Authorization: Bearer {{adminToken}}
+Authorization: Bearer {{admin}}
 
 ###
 GET {{baseUrl}}/admin/stats
-Authorization: Bearer {{adminToken}}
+Authorization: Bearer {{admin}}
+
+###
+DELETE {{baseUrl}}/consultations/{{consultationId}}/reviews/{{review.response.body.$.id}}
+Authorization: Bearer {{client}}
+
+###
+DELETE {{baseUrl}}/consultations/{{consultationId}}
+Authorization: Bearer {{admin}}
+
+###
+GET {{baseUrl}}/consultations/{{consultationId}}
