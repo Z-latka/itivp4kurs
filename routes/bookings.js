@@ -2,8 +2,25 @@ const express = require("express");
 const router = express.Router();
 const { Booking, Consultation } = require("../models");
 const { authenticateToken, isStaff } = require("../middleware/auth");
+const { notifyUser } = require("../socket");
 
 const STATUSES = ["pending", "confirmed", "completed", "cancelled"];
+
+const STATUS_TITLES = {
+  pending: "Запись ожидает подтверждения",
+  confirmed: "Психолог подтвердил вашу запись",
+  completed: "Консультация отмечена как завершённая",
+  cancelled: "Запись отменена психологом",
+};
+
+const when = (date) =>
+  new Date(date).toLocaleString("ru-RU", {
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Minsk",
+  });
 
 router.use(authenticateToken);
 
@@ -76,6 +93,14 @@ router.post("/", async (req, res, next) => {
       comment,
     });
     await booking.populate(populateConsultation);
+    if (booking.psychologist) {
+      notifyUser(String(booking.psychologist), {
+        type: "booking",
+        title: "Новая запись на консультацию",
+        text: `${consultation.topic} — ${when(date)}`,
+        link: "work",
+      });
+    }
     res.status(201).json(serialize(booking));
   } catch (err) {
     next(err);
@@ -111,6 +136,21 @@ router.patch("/:id/cancel", async (req, res, next) => {
     }
     booking.status = "cancelled";
     await booking.save();
+    if (String(booking.user) === req.user.id && booking.psychologist) {
+      notifyUser(String(booking.psychologist), {
+        type: "booking",
+        title: "Клиент отменил запись",
+        text: when(booking.scheduledAt),
+        link: "work",
+      });
+    } else if (String(booking.user) !== req.user.id) {
+      notifyUser(String(booking.user), {
+        type: "booking",
+        title: STATUS_TITLES.cancelled,
+        text: when(booking.scheduledAt),
+        link: "profile?tab=bookings",
+      });
+    }
     res.json(booking);
   } catch (err) {
     next(err);
@@ -145,6 +185,12 @@ router.patch("/:id/status", isStaff, async (req, res, next) => {
     if (!booking) {
       return res.status(404).json({ message: "Запись не найдена" });
     }
+    notifyUser(String(booking.user), {
+      type: "booking",
+      title: STATUS_TITLES[status],
+      text: when(booking.scheduledAt),
+      link: "profile?tab=bookings",
+    });
     res.json(booking);
   } catch (err) {
     next(err);

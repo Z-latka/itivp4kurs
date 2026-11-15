@@ -21,6 +21,7 @@ import {
 import { navigate } from "../router";
 import { useAuth } from "../auth/context";
 import { useToast } from "../toast/context";
+import { useSocket, useSocketEvent } from "../socket/context";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { Badge, EmptyState, Loader, PageHeader } from "../components/ui";
 import { QUESTION_STATUS, formatDate } from "../labels";
@@ -187,15 +188,32 @@ function QuestionsList() {
   );
 }
 
+const msgId = (m) => m.id || m._id;
+
+function appendMessage(question, message, status) {
+  if (!question) return question;
+  const exists = question.messages.some((m) => msgId(m) === msgId(message));
+  return {
+    ...question,
+    status: status || question.status,
+    messages: exists ? question.messages : [...question.messages, message],
+  };
+}
+
 function Thread({ id }) {
   const { user, isPsychologist } = useAuth();
+  const { socket, connected } = useSocket();
   const toast = useToast();
   const [question, setQuestion] = useState(null);
   const [error, setError] = useState(null);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
+  const [present, setPresent] = useState([]);
+  const [typing, setTyping] = useState(null);
   const endRef = useRef(null);
+  const typingTimer = useRef(null);
+  const typingSent = useRef(false);
   const count = question?.messages.length;
 
   const load = useCallback(
@@ -208,15 +226,80 @@ function Thread({ id }) {
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  useEffect(() => {
+    if (connected) return undefined;
     const timer = setInterval(() => {
       if (document.visibilityState === "visible") load();
     }, POLL_MS);
     return () => clearInterval(timer);
-  }, [load]);
+  }, [connected, load]);
+
+  useEffect(() => {
+    if (!socket || !connected) return undefined;
+    socket.emit("question:join", id, (res) => {
+      if (res?.ok) setPresent(res.present);
+    });
+    load();
+    return () => {
+      socket.emit("question:leave", id);
+      setPresent([]);
+      setTyping(null);
+    };
+  }, [socket, connected, id, load]);
+
+  useSocketEvent("chat:message", ({ questionId, message, status }) => {
+    if (questionId !== id) return;
+    setQuestion((q) => appendMessage(q, message, status));
+    setTyping(null);
+  });
+
+  useSocketEvent("chat:typing", ({ questionId, name, typing: isTyping }) => {
+    if (questionId === id) setTyping(isTyping ? name : null);
+  });
+
+  useSocketEvent("chat:presence", ({ questionId, name, role, online }) => {
+    if (questionId !== id) return;
+    setPresent((list) => {
+      if (online) return [...list, { name, role }];
+      const index = list.findIndex((p) => p.name === name && p.role === role);
+      return index === -1 ? list : list.filter((_, i) => i !== index);
+    });
+    if (!online) setTyping(null);
+    const viewerIsPsychologist = isPsychologist && String(question?.userId) !== String(user.id);
+    if (role === (viewerIsPsychologist ? "user" : "psychologist")) {
+      const who = name || (role === "psychologist" ? "Психолог" : "Клиент");
+      toast(online ? `${who} подключился к чату` : `${who} вышел из чата`, "info");
+    }
+  });
+
+  useSocketEvent("chat:assigned", ({ questionId, psychologist }) => {
+    if (questionId !== id) return;
+    const owner = String(question?.userId) === String(user.id);
+    if (isPsychologist && !owner && psychologist && psychologist.id !== String(user.id)) {
+      toast("Это обращение взял другой специалист", "info");
+      navigate("work?tab=questions");
+      return;
+    }
+    load();
+  });
+
+  useSocketEvent("chat:closed", ({ questionId }) => {
+    if (questionId === id) setQuestion((q) => (q ? { ...q, status: "closed" } : q));
+  });
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "nearest" });
-  }, [count]);
+  }, [count, typing]);
+
+  useEffect(
+    () => () => {
+      clearTimeout(typingTimer.current);
+      if (typingSent.current && socket) socket.emit("chat:typing", { questionId: id, typing: false });
+    },
+    [socket, id],
+  );
 
   if (error && !question) {
     return (
@@ -231,6 +314,15 @@ function Thread({ id }) {
   const isOwner = String(question.userId) === String(user.id);
   const asPsychologist = isPsychologist && !isOwner;
   const unassigned = !question.psychologist;
+  const counterpartRole = asPsychologist ? "user" : "psychologist";
+  const counterpart = present.find((p) => p.role === counterpartRole);
+  const status = QUESTION_STATUS[question.status] || QUESTION_STATUS.open;
+
+  const sendTyping = (value) => {
+    if (!socket || !connected || typingSent.current === value) return;
+    typingSent.current = value;
+    socket.emit("chat:typing", { questionId: id, typing: value });
+  };
 
   const handleTake = async () => {
     try {
@@ -241,14 +333,33 @@ function Thread({ id }) {
       toast(errorMessage(err), "error");
     }
   };
-  const status = QUESTION_STATUS[question.status] || QUESTION_STATUS.open;
+
+  const handleChange = (e) => {
+    setText(e.target.value);
+    sendTyping(true);
+    clearTimeout(typingTimer.current);
+    typingTimer.current = setTimeout(() => sendTyping(false), 2500);
+  };
 
   const handleSend = async (e) => {
     e?.preventDefault();
-    if (!text.trim()) return;
+    const value = text.trim();
+    if (!value || sending) return;
     setSending(true);
+    clearTimeout(typingTimer.current);
+    sendTyping(false);
+    if (socket && connected) {
+      socket.timeout(8000).emit("chat:message", { questionId: id, text: value }, (err, res) => {
+        setSending(false);
+        if (err) return toast("Сервер не ответил, попробуйте ещё раз", "error");
+        if (!res.ok) return toast(res.message, "error");
+        setText("");
+        setQuestion((q) => appendMessage(q, res.message));
+      });
+      return;
+    }
     try {
-      await sendMessage(id, text);
+      await sendMessage(id, value);
       setText("");
       await load();
     } catch (err) {
@@ -270,6 +381,7 @@ function Thread({ id }) {
   };
 
   const backTo = asPsychologist ? "work?tab=questions" : "ask";
+  const counterpartLabel = asPsychologist ? "Клиент" : "Психолог";
 
   return (
     <section className="page">
@@ -304,7 +416,7 @@ function Thread({ id }) {
             const fromPsychologist = m.authorRole === "psychologist";
             const mine = asPsychologist ? fromPsychologist : !fromPsychologist;
             return (
-              <div key={m.id || m._id || i} className={`message${mine ? " mine" : ""}`}>
+              <div key={msgId(m) || i} className={`message${mine ? " mine" : ""}`}>
                 <div className="message-author">
                   {fromPsychologist ? <Stethoscope size={13} /> : <UserRound size={13} />}
                   {fromPsychologist
@@ -320,10 +432,34 @@ function Thread({ id }) {
               </div>
             );
           })}
-          {!asPsychologist && question.status === "open" && (
-            <p className="muted small center">Психолог ответит в течение суток. Страница обновляется сама.</p>
+          {!asPsychologist && question.status === "open" && !typing && (
+            <p className="muted small center">Психолог ответит в течение суток — ответ появится здесь сразу, без обновления страницы.</p>
           )}
           <div ref={endRef} />
+        </div>
+
+        <div className="chat-status">
+          {!connected ? (
+            <>
+              <span className="live-dot" />
+              Нет соединения с сервером — переписка обновляется раз в 15 секунд
+            </>
+          ) : typing ? (
+            <>
+              <span className="typing-dots" aria-hidden="true"><i /><i /><i /></span>
+              {typing} печатает…
+            </>
+          ) : counterpart ? (
+            <>
+              <span className="live-dot on" />
+              {counterpart.name || counterpartLabel} сейчас в чате
+            </>
+          ) : (
+            <>
+              <span className="live-dot" />
+              {counterpartLabel} сейчас не в чате
+            </>
+          )}
         </div>
 
         {asPsychologist && unassigned && question.status !== "closed" && (
@@ -348,7 +484,8 @@ function Thread({ id }) {
               rows={3}
               value={text}
               maxLength={5000}
-              onChange={(e) => setText(e.target.value)}
+              onChange={handleChange}
+              onBlur={() => sendTyping(false)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleSend();
               }}

@@ -4,12 +4,15 @@ import './index.css'
 import App from './App.jsx'
 import AuthProvider from './auth/AuthProvider.jsx'
 import ToastProvider from './toast/ToastProvider.jsx'
+import SocketProvider from './socket/SocketProvider.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ToastProvider>
       <AuthProvider>
-        <App />
+        <SocketProvider>
+          <App />
+        </SocketProvider>
       </AuthProvider>
     </ToastProvider>
   </StrictMode>,

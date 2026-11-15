@@ -63,6 +63,11 @@ const initSocket = (io) => {
     online.set(user.id, entry);
     io.to("role:admin").emit("online", onlineStats());
 
+    socket.on("online:get", (ack = () => {}) => {
+      if (user.role !== "admin") return ack({ ok: false, message: "Недостаточно прав" });
+      ack({ ok: true, stats: onlineStats() });
+    });
+
     socket.on("question:join", async (questionId, ack = () => {}) => {
       try {
         const question = await Question.findById(questionId);

@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { Question } = require("../models");
 const { authenticateToken, isPsychologist } = require("../middleware/auth");
+const { notifyUser, notifyRole, emitToQuestion } = require("../socket");
 
 router.use(authenticateToken);
 
@@ -44,6 +45,12 @@ router.post("/", async (req, res, next) => {
       user: req.user.id,
       topic,
       messages: [{ authorRole: "user", text }],
+    });
+    notifyRole("psychologist", {
+      type: "question",
+      title: "Новый вопрос в общей очереди",
+      text: topic,
+      link: "work?tab=questions",
     });
     res.status(201).json(question);
   } catch (err) {
@@ -94,7 +101,15 @@ router.post("/:id/assign", isPsychologist, async (req, res, next) => {
     if (!question) {
       return res.status(409).json({ message: "Обращение уже взял другой специалист" });
     }
-    res.json(serialize(question));
+    const json = serialize(question);
+    emitToQuestion(question.id, "chat:assigned", { questionId: question.id, psychologist: json.psychologist });
+    notifyUser(question.userId, {
+      type: "question",
+      title: "Психолог взял ваше обращение",
+      text: `${json.psychologist.fullName}: «${question.topic}»`,
+      link: `ask/${question.id}`,
+    });
+    res.json(json);
   } catch (err) {
     next(err);
   }
@@ -130,7 +145,17 @@ router.post("/:id/messages", async (req, res, next) => {
     if (!updated) {
       return res.status(409).json({ message: "Обращение уже взял другой специалист" });
     }
-    res.status(201).json(updated.messages.at(-1));
+    const message = updated.messages.at(-1).toJSON();
+    emitToQuestion(updated.id, "chat:message", { questionId: updated.id, message, status: updated.status });
+    const notice = {
+      type: "message",
+      title: fromPsychologist ? "Психолог ответил на обращение" : "Новое сообщение от клиента",
+      text: updated.topic,
+      link: `ask/${updated.id}`,
+    };
+    if (fromPsychologist) notifyUser(String(updated.user), notice);
+    else if (updated.psychologist) notifyUser(String(updated.psychologist), notice);
+    res.status(201).json(message);
   } catch (err) {
     next(err);
   }
@@ -142,6 +167,7 @@ router.patch("/:id/close", async (req, res, next) => {
     if (!question) return;
     question.status = "closed";
     await question.save();
+    emitToQuestion(question.id, "chat:closed", { questionId: question.id });
     res.json(serialize(question));
   } catch (err) {
     next(err);

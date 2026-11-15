@@ -19,6 +19,7 @@ import {
 } from "../api";
 import { navigate } from "../router";
 import { useToast } from "../toast/context";
+import { useSocket, useSocketEvent } from "../socket/context";
 import BookingsBoard from "../components/BookingsBoard";
 import ConsultationsPage from "../components/ConsultationList";
 import ConfirmDialog from "../components/ConfirmDialog";
@@ -44,6 +45,34 @@ function Bars({ data, labels }) {
           <div className="bar"><div style={{ width: `${(v / max) * 100}%`, background: l.color }} /></div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function OnlineCard() {
+  const { socket, connected } = useSocket();
+  const [online, setOnline] = useState(null);
+
+  useEffect(() => {
+    if (!socket || !connected) return;
+    socket.emit("online:get", (res) => {
+      if (res?.ok) setOnline(res.stats);
+    });
+  }, [socket, connected]);
+
+  useSocketEvent("online", setOnline);
+
+  return (
+    <div className="card online-card">
+      <span className={`live-dot${connected ? " on" : ""}`} aria-hidden="true" />
+      <strong>Сейчас на сайте: {connected && online ? online.total : "—"}</strong>
+      {connected && online ? (
+        <span className="muted small">
+          клиентов {online.user} · психологов {online.psychologist} · администраторов {online.admin}
+        </span>
+      ) : (
+        <span className="muted small">нет соединения с сервером</span>
+      )}
     </div>
   );
 }
@@ -74,6 +103,7 @@ function OverviewTab() {
 
   return (
     <>
+      <OnlineCard />
       <div className="stats-row">
         {tiles.map((t) => {
           const Icon = t.icon;

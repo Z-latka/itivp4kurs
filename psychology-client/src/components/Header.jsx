@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Leaf, LifeBuoy, LogOut, Menu, Moon, Sun, X } from "lucide-react";
 import { navigate } from "../router";
 import { useAuth } from "../auth/context";
+import { useSocket } from "../socket/context";
 import { useTheme } from "../theme";
 import { Avatar } from "./ui";
 import SosDialog from "./SosDialog";
@@ -9,6 +10,7 @@ import SosDialog from "./SosDialog";
 export default function Header({ currentPage }) {
   const { user, isAdmin, isPsychologist, homePage, signOut } = useAuth();
   const { theme, toggle } = useTheme();
+  const { connected } = useSocket();
   const [open, setOpen] = useState(false);
   const [sosOpen, setSosOpen] = useState(false);
 
@@ -104,9 +106,10 @@ export default function Header({ currentPage }) {
               <button
                 className={`user-chip${currentPage === homePage ? " active" : ""}`}
                 onClick={() => go(homePage)}
-                title={isAdmin ? "Администрирование" : isPsychologist ? "Рабочее место" : "Личный кабинет"}
+                title={`${isAdmin ? "Администрирование" : isPsychologist ? "Рабочее место" : "Личный кабинет"} · ${connected ? "в сети" : "нет соединения"}`}
               >
                 <Avatar name={user.nickname} />
+                <span className={`live-dot${connected ? " on" : ""}`} aria-hidden="true" />
                 <span className="ellipsis hide-mobile chip-name">{user.nickname || "Кабинет"}</span>
               </button>
               <button
