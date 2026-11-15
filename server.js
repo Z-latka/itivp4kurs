@@ -1,5 +1,7 @@
 require("dotenv").config();
+const http = require("http");
 const express = require("express");
+const { Server } = require("socket.io");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const app = express();
@@ -14,6 +16,7 @@ const questionsRouter = require("./routes/questions");
 const moodsRouter = require("./routes/moods");
 const psychologistsRouter = require("./routes/psychologists");
 const adminRouter = require("./routes/admin");
+const { initSocket } = require("./socket");
 
 app.use(express.json());
 app.use(cors());
@@ -102,7 +105,10 @@ app.use((err, req, res, next) => {
 
 connectDB()
   .then(() => {
-    app.listen(PORT, () => {
+    const server = http.createServer(app);
+    const io = new Server(server, { cors: { origin: "*" }, maxHttpBufferSize: 20000 });
+    initSocket(io);
+    server.listen(PORT, () => {
       console.log(`Сервер запущен на http://localhost:${PORT}`);
     });
   })
