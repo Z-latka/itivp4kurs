@@ -34,6 +34,7 @@ export default function SocketProvider({ children }) {
     });
     client.on("connect_error", () => setConnected(false));
     client.on("notification", (n) => {
+      if (n.link && window.location.hash.replace(/^#\/?/, "") === n.link) return;
       toast(n.text, "notice", {
         title: n.title,
         duration: 7000,

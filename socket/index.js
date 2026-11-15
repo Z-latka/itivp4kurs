@@ -47,6 +47,7 @@ const initSocket = (io) => {
         name: user.role === "psychologist" ? user.specialist?.fullName : user.profile?.nickname,
       };
       socket.data.sent = [];
+      socket.data.joins = new Map();
       next();
     } catch {
       next(new Error("Недействительный токен"));
@@ -70,10 +71,15 @@ const initSocket = (io) => {
 
     socket.on("question:join", async (questionId, ack = () => {}) => {
       try {
+        const seq = (socket.data.joins.get(questionId) || 0) + 1;
+        socket.data.joins.set(questionId, seq);
         const question = await Question.findById(questionId);
+        if (socket.data.joins.get(questionId) !== seq) return ack({ ok: false, message: "Запрос устарел" });
         if (!question || !question.canAccess(user)) return ack({ ok: false, message: "Обращение не найдено" });
-        socket.join(roomOf(questionId));
-        socket.to(roomOf(questionId)).emit("chat:presence", { questionId, name: user.name, role: user.role, online: true });
+        if (!socket.rooms.has(roomOf(questionId))) {
+          socket.join(roomOf(questionId));
+          socket.to(roomOf(questionId)).emit("chat:presence", { questionId, name: user.name, role: user.role, online: true });
+        }
         const sockets = await io.in(roomOf(questionId)).fetchSockets();
         const present = sockets
           .filter((s) => s.id !== socket.id)
@@ -85,6 +91,8 @@ const initSocket = (io) => {
     });
 
     socket.on("question:leave", (questionId) => {
+      socket.data.joins.set(questionId, (socket.data.joins.get(questionId) || 0) + 1);
+      if (!socket.rooms.has(roomOf(questionId))) return;
       socket.leave(roomOf(questionId));
       socket.to(roomOf(questionId)).emit("chat:presence", { questionId, name: user.name, role: user.role, online: false });
     });
