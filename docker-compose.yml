@@ -28,6 +28,7 @@ services:
       MONGO_URI: mongodb://${MONGO_ROOT_USER:-mindcare}:${MONGO_ROOT_PASSWORD:-mindcare_pass}@db:27017/?authSource=admin
       MONGO_DB: ${MONGO_DB:-mindcare}
       MONGO_DNS: ""
+      DOTENV_CONFIG_QUIET: "true"
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is not set in .env}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-12h}
     ports:
@@ -40,17 +41,20 @@ services:
       - frontend-net
 
   seed:
-    build: .
     image: mindcare-backend:latest
+    pull_policy: never
     command: ["node", "scripts/seed.js"]
     restart: "no"
     environment:
       MONGO_URI: mongodb://${MONGO_ROOT_USER:-mindcare}:${MONGO_ROOT_PASSWORD:-mindcare_pass}@db:27017/?authSource=admin
       MONGO_DB: ${MONGO_DB:-mindcare}
       MONGO_DNS: ""
+      DOTENV_CONFIG_QUIET: "true"
     depends_on:
       db:
         condition: service_healthy
+      backend:
+        condition: service_started
     networks:
       - backend-net
 
