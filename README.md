@@ -3,17 +3,18 @@
 Курсовой проект: анонимные консультации с психологом, психологические тесты,
 личный кабинет и панель психолога.
 
-**Ветка `27` — Лабораторная работа №7: реальное время с WebSocket (Socket.IO).**
-Анонимная переписка с психологом работает как живой чат: сообщения, индикатор
-«печатает…», присутствие собеседника и уведомления о событиях приходят мгновенно,
-без перезагрузки страницы. История переписки хранится в MongoDB.
+**Ветка `28` — Лабораторная работа №8: контейнеризация с Docker.**
+Backend, frontend и MongoDB упакованы в контейнеры и запускаются одной командой
+`docker compose up --build`. Frontend собирается многоэтапно и отдаётся через Nginx,
+который же проксирует REST API и WebSocket на backend.
 
 | Ветка | Содержание |
 |-------|------------|
 | `lab21` … `24` | REST API, PostgreSQL/Sequelize, JWT + роли, состояние в React |
 | `25` | ЛР5: React-клиент, интеграция с REST API |
 | `26` | Доработка сайта + ЛР6: MongoDB / Mongoose |
-| **`27`** | **ЛР7: WebSocket / Socket.IO — чат, уведомления, присутствие** |
+| `27` | ЛР7: WebSocket / Socket.IO — чат, уведомления, присутствие |
+| **`28`** | **ЛР8: Docker — Dockerfile, многоэтапная сборка, Docker Compose** |
 
 ## Возможности сайта
 
@@ -45,7 +46,81 @@
 клиент не может создать консультацию, психолог не может изменить чужую, администратор
 не может прочитать обращение. Отключённый администратором психолог не может войти.
 
-## Запуск (ветка 27)
+## Запуск в Docker (ветка 28)
+
+Нужен только Docker Desktop (или Docker Engine + Compose v2). Node.js и MongoDB
+на компьютере не требуются.
+
+```bash
+cp .env.example .env        # задать JWT_SECRET; остальное можно оставить по умолчанию
+docker compose up --build   # или docker-compose up --build
+```
+
+| Адрес | Что открывается |
+|-------|-----------------|
+| http://localhost | сайт (Nginx отдаёт сборку React) |
+| http://localhost/api/health | API через reverse-proxy Nginx |
+| http://localhost:5000/api/health | backend напрямую |
+| http://127.0.0.1:8081 | mongo-express, логин и пароль — `ME_USER` / `ME_PASSWORD` |
+
+Демо-данные создаёт одноразовый сервис `seed` при каждом запуске (повторно ничего
+не дублирует). Учётные записи — в таблице «Демо-аккаунты» ниже.
+
+### Сервисы
+
+| Сервис | Образ | Порт на хосте | Сети |
+|--------|-------|---------------|------|
+| `db` | `mongo:7` | — (наружу не открыт) | `backend-net` |
+| `backend` | собирается из `./Dockerfile` | `5000` | `backend-net`, `frontend-net` |
+| `seed` | тот же образ, что у backend | — | `backend-net` |
+| `frontend` | собирается из `./psychology-client/Dockerfile` | `80` | `frontend-net` |
+| `mongo-express` | `mongo-express:1.0.2` | `127.0.0.1:8081` | `backend-net`, `admin-net` |
+
+```
+браузер ──► :80  frontend (Nginx) ──/api, /socket.io──► backend:5000 ──► db:27017
+                                       frontend-net             backend-net (internal)
+```
+
+### Дополнительные требования
+
+- **Переменные окружения из `.env`** — Compose подставляет `JWT_SECRET`, `MONGO_ROOT_USER`,
+  `MONGO_ROOT_PASSWORD`, `MONGO_DB` и порты из файла `.env` (шаблон — `.env.example`).
+  Сам `.env` в образ не попадает (`.dockerignore`).
+- **Healthcheck** — у `db` (`mongosh ping`), `backend` (`GET /api/health`) и `frontend`.
+  Backend стартует только после `service_healthy` базы, frontend — после `service_healthy` backend.
+- **Reverse-proxy Nginx** — `psychology-client/nginx.conf`: статика React, проксирование
+  `/api/` и `/socket.io/` (с заголовками `Upgrade`/`Connection` для WebSocket).
+  Клиент собирается с `VITE_API_URL=/api`, поэтому работает с любого адреса без CORS.
+- **Изоляция сетей** — `backend-net` объявлена `internal: true`: у MongoDB нет выхода
+  в интернет и она недоступна с хоста; frontend не видит базу напрямую.
+- **mongo-express** — веб-интерфейс к базе, опубликован только на `127.0.0.1`
+  и закрыт логином и паролем.
+
+### Полезные команды
+
+```bash
+docker ps                                   # запущенные контейнеры
+docker compose logs -f backend              # логи сервиса
+docker compose exec backend sh              # оболочка внутри контейнера
+docker compose exec db mongosh -u mindcare -p mindcare_pass
+docker compose run --rm seed node scripts/seed.js --reset   # пересоздать демо-данные
+docker compose down                         # остановить (данные в томе mongo-data сохраняются)
+docker compose down -v                      # остановить и удалить том с базой
+```
+
+### Доступ к Docker Hub
+
+Если Docker Hub недоступен, в настройках Docker Desktop (*Settings → Docker Engine*)
+или в `/etc/docker/daemon.json` добавьте зеркала и перезапустите Docker:
+
+```json
+{ "registry-mirrors": ["https://mirror.gcr.io", "https://dockerhub.timeweb.cloud"] }
+```
+
+Используемые базовые образы: `node:22-alpine`, `nginx:1.27-alpine`, `mongo:7`,
+`mongo-express:1.0.2`.
+
+## Запуск без Docker (ветка 27)
 
 Требуется Node.js 20+.
 
@@ -118,9 +193,15 @@ URL API задаётся в `psychology-client/.env`: `VITE_API_URL=http://local
 
 При регистрации через сайт роль всегда `user`. Психологов добавляет администратор.
 
-## Структура (ветка 27)
+## Структура (ветка 28)
 
 ```
+Dockerfile                образ backend (node:22-alpine, npm ci --omit=dev, HEALTHCHECK)
+docker-compose.yml        db, backend, seed, frontend, mongo-express; том mongo-data; сети
+.dockerignore             что не попадает в образ (node_modules, .env, клиент)
+psychology-client/
+  Dockerfile              многоэтапная сборка: node (vite build) → nginx
+  nginx.conf              статика + reverse-proxy /api и /socket.io
 db.js                     подключение mongoose.connect(process.env.MONGO_URI)
 models/
   User.js                 роль; вложенные profile{} и specialist{} (анкета психолога);
